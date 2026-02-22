@@ -95,7 +95,6 @@ GCAM_ISO3_PATH = PROJECT_ROOT / "data" / "gcam" / "region_iso3.csv"
 I18N = {
     "en": {
         "subtitle": "eXplainable Intelligent Resilience Agent Network for Geothermal systems",
-        "subtitle_hint": "UK Well Monitoring · Global GCAM Scenarios",
         "tab_monitor": "UK Well Monitoring",
         "tab_gcam": "Global GCAM Scenarios",
         "data_source": "Data Source",
@@ -118,7 +117,6 @@ I18N = {
     },
     "zh": {
         "subtitle": "eXplainable Intelligent Resilience Agent Network for Geothermal systems",
-        "subtitle_hint": "英国井网监测 · 全球GCAM情景",
         "tab_monitor": "英国井网监测",
         "tab_gcam": "全球GCAM情景",
         "data_source": "数据源",
@@ -973,39 +971,33 @@ def main() -> None:
     banner_html = """
     <style>
     .xirang-title {
-        font-size: 4.0rem;
+        font-size: 3.6rem;
         font-weight: 800;
-        line-height: 1.05;
-        margin: 0.1rem 0 0.2rem 0;
+        line-height: 1.08;
+        margin: 0.15rem 0 0.35rem 0;
         color: #1f2937;
         letter-spacing: 0.5px;
     }
     .xirang-subtitle {
-        font-size: 2.0rem;
-        font-weight: 700;
-        color: #1f2937;
-        margin-top: 0.35rem;
-        margin-bottom: 0.2rem;
-        line-height: 1.28;
-    }
-    .xirang-hint {
-        font-size: 1.25rem;
+        font-size: 1.42rem;
         font-weight: 600;
-        color: #475569;
-        margin-bottom: 1.25rem;
+        color: #334155;
+        margin-top: 0.15rem;
+        margin-bottom: 1.1rem;
+        line-height: 1.45;
+        max-width: 980px;
     }
     .stTabs [data-baseweb="tab"] {
-        font-size: 1.45rem;
-        font-weight: 800;
-        min-height: 58px;
-        padding-top: 0.35rem;
-        padding-bottom: 0.35rem;
+        font-size: 1.28rem;
+        font-weight: 700;
+        min-height: 52px;
+        padding-top: 0.28rem;
+        padding-bottom: 0.28rem;
     }
     </style>
     <div class="xirang-title">XIRANG (息壤)</div>
     <div class="xirang-subtitle">%s</div>
-    <div class="xirang-hint">%s</div>
-    """ % (tr("subtitle"), tr("subtitle_hint"))
+    """ % tr("subtitle")
     st.markdown(banner_html, unsafe_allow_html=True)
 
     st.sidebar.header(tr("data_source"))
