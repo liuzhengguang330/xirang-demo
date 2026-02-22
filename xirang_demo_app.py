@@ -1229,6 +1229,23 @@ def main() -> None:
         line-height: 1.45;
         max-width: 980px;
     }
+    .xirang-hero {
+        position: relative;
+        padding-top: 0.2rem;
+    }
+    .xirang-lab {
+        position: absolute;
+        top: 0.1rem;
+        right: 0.2rem;
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #64748b;
+        letter-spacing: 0.4px;
+        border: 1px solid #cbd5e1;
+        padding: 0.18rem 0.5rem;
+        border-radius: 999px;
+        background: #f8fafc;
+    }
     .xirang-accent {
         color: #0f766e;
         font-weight: 800;
@@ -1242,8 +1259,11 @@ def main() -> None:
         padding-bottom: 0.28rem;
     }
     </style>
+    <div class="xirang-hero">
+    <div class="xirang-lab">REAI Lab</div>
     <div class="xirang-title">XIRANG (息壤)</div>
     <div class="xirang-subtitle">%s</div>
+    </div>
     """ % format_xirang_subtitle_html()
     st.markdown(banner_html, unsafe_allow_html=True)
 
