@@ -148,6 +148,18 @@ def tr(key: str) -> str:
     return I18N.get(lang, I18N["en"]).get(key, key)
 
 
+def format_xirang_subtitle_html() -> str:
+    """Highlight X I R A N G letters in the expanded project name."""
+    return (
+        '<span class="xirang-accent">eX</span>plainable '
+        '<span class="xirang-accent">I</span>ntelligent '
+        '<span class="xirang-accent">R</span>esilience '
+        '<span class="xirang-accent">A</span>gent '
+        '<span class="xirang-accent">N</span>etwork for '
+        '<span class="xirang-accent">G</span>eothermal systems'
+    )
+
+
 def metrics_dictionary_df() -> pd.DataFrame:
     rows = [
         {
@@ -1217,6 +1229,11 @@ def main() -> None:
         line-height: 1.45;
         max-width: 980px;
     }
+    .xirang-accent {
+        color: #0f766e;
+        font-weight: 800;
+        letter-spacing: 0.2px;
+    }
     .stTabs [data-baseweb="tab"] {
         font-size: 1.28rem;
         font-weight: 700;
@@ -1227,7 +1244,7 @@ def main() -> None:
     </style>
     <div class="xirang-title">XIRANG (息壤)</div>
     <div class="xirang-subtitle">%s</div>
-    """ % tr("subtitle")
+    """ % format_xirang_subtitle_html()
     st.markdown(banner_html, unsafe_allow_html=True)
 
     st.sidebar.header(tr("data_source"))
