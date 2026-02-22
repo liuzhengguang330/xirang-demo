@@ -1,0 +1,21 @@
+region,iso3,potential_mwe,category
+United States,USA,30000,Hydrothermal
+China,CHN,27000,Hydrothermal
+Indonesia,IDN,29000,Volcanic
+Japan,JPN,23000,Volcanic
+Philippines,PHL,6000,Volcanic
+Turkey,TUR,4500,Hydrothermal
+Mexico,MEX,8000,Hydrothermal
+Italy,ITA,5000,Volcanic
+New Zealand,NZL,3500,Volcanic
+Iceland,ISL,7000,Volcanic
+Kenya,KEN,10000,Rift
+Ethiopia,ETH,7000,Rift
+Chile,CHL,16000,Volcanic
+Peru,PER,3500,Volcanic
+Argentina,ARG,4500,Volcanic
+United Kingdom,GBR,1500,EGS
+Germany,DEU,2200,EGS
+France,FRA,1800,EGS
+India,IND,10000,Hydrothermal
+Brazil,BRA,2500,Hydrothermal

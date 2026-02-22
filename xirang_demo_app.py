@@ -91,6 +91,7 @@ GCAM_SAMPLE_PATH = PROJECT_ROOT / "data" / "gcam" / "gcam_global_sample.csv"
 GCAM_CENTROID_PATH = PROJECT_ROOT / "data" / "gcam" / "region_centroids.csv"
 GCAM_REGION_COLOR_PATH = PROJECT_ROOT / "data" / "gcam" / "region_colors.csv"
 GCAM_ISO3_PATH = PROJECT_ROOT / "data" / "gcam" / "region_iso3.csv"
+GEOTHERMAL_POTENTIAL_PATH = PROJECT_ROOT / "data" / "geothermal" / "global_geothermal_potential.csv"
 
 I18N = {
     "en": {
@@ -461,6 +462,23 @@ def load_region_iso3(path: str) -> pd.DataFrame:
     df["region"] = df["region"].astype(str).str.strip()
     df["iso3"] = df["iso3"].astype(str).str.upper().str.strip()
     return df
+
+
+@st.cache_data(show_spinner=False)
+def load_geothermal_potential(path: str) -> pd.DataFrame:
+    df = pd.read_csv(path)
+    required = {"region", "iso3", "potential_mwe"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing geothermal potential columns: {sorted(missing)}")
+    out = df.copy()
+    out["region"] = out["region"].astype(str).str.strip()
+    out["iso3"] = out["iso3"].astype(str).str.strip().str.upper()
+    out["potential_mwe"] = pd.to_numeric(out["potential_mwe"], errors="coerce")
+    if "category" not in out.columns:
+        out["category"] = "Unknown"
+    out["category"] = out["category"].astype(str).str.strip()
+    return out.dropna(subset=["iso3", "potential_mwe"])
 
 
 @st.cache_data(show_spinner=False)
@@ -952,6 +970,67 @@ def render_gcam_tab() -> None:
                 s3.metric("Max", f"{vmax:,.2f} {unit}")
         else:
             st.info("No centroid match found for currently selected regions.")
+
+    st.markdown("**Global Geothermal Potential**")
+    use_uploaded_geo_potential = st.checkbox("Upload custom geothermal potential CSV", value=False)
+    potential_df = None
+    if use_uploaded_geo_potential:
+        uploaded_pot = st.file_uploader(
+            "Upload geothermal potential CSV (columns: region,iso3,potential_mwe[,category])",
+            type=["csv"],
+            key="geo_potential",
+        )
+        if uploaded_pot is not None:
+            try:
+                potential_df = load_geothermal_potential(uploaded_pot)
+            except Exception as exc:
+                st.error(f"Failed to read geothermal potential file: {exc}")
+                return
+    else:
+        if GEOTHERMAL_POTENTIAL_PATH.exists():
+            potential_df = load_geothermal_potential(str(GEOTHERMAL_POTENTIAL_PATH))
+
+    if potential_df is None or potential_df.empty:
+        st.info("No geothermal potential data loaded.")
+    else:
+        cat_list = sorted(potential_df["category"].dropna().unique().tolist())
+        selected_cat = st.multiselect("Potential Category", cat_list, default=cat_list)
+        pot_view = potential_df[potential_df["category"].isin(selected_cat)] if selected_cat else potential_df.copy()
+
+        if pot_view.empty:
+            st.info("No geothermal potential records match selected category.")
+        else:
+            fig_pot = px.choropleth(
+                pot_view,
+                locations="iso3",
+                color="potential_mwe",
+                hover_name="region",
+                hover_data={"potential_mwe": ":,.0f", "iso3": False, "category": True},
+                color_continuous_scale="YlOrRd",
+                projection="natural earth",
+                title="Estimated Geothermal Potential (MWe)",
+            )
+            fig_pot.update_layout(margin=dict(l=0, r=0, t=45, b=0), coloraxis_colorbar_title="MWe")
+            st.plotly_chart(fig_pot, use_container_width=True)
+
+            top_pot = pot_view.sort_values("potential_mwe", ascending=False).head(15)
+            bar_pot = (
+                alt.Chart(top_pot)
+                .mark_bar()
+                .encode(
+                    x=alt.X("potential_mwe:Q", title="Potential (MWe)"),
+                    y=alt.Y("region:N", sort="-x", title="Region"),
+                    color=alt.Color("potential_mwe:Q", scale=alt.Scale(scheme="yelloworangered"), legend=None),
+                    tooltip=["region:N", "iso3:N", alt.Tooltip("potential_mwe:Q", title="MWe"), "category:N"],
+                )
+                .properties(height=360)
+            )
+            st.altair_chart(bar_pot, use_container_width=True)
+
+            p1, p2, p3 = st.columns(3)
+            p1.metric("Countries", int(pot_view["iso3"].nunique()))
+            p2.metric("Total Potential (MWe)", f"{float(pot_view['potential_mwe'].sum()):,.0f}")
+            p3.metric("Max Country (MWe)", f"{float(pot_view['potential_mwe'].max()):,.0f}")
 
 
 def main() -> None:
