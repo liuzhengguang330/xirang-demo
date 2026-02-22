@@ -190,6 +190,44 @@ def metrics_dictionary_df() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def gcam_quality_report(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Return summary checks and sample problematic rows for quick audit."""
+    checks = []
+    issues_frames = []
+
+    null_rows = df[df[["year", "region", "variable", "value", "scenario"]].isna().any(axis=1)]
+    checks.append({"Check": "Null in core columns", "Count": int(len(null_rows)), "Status": "FAIL" if len(null_rows) else "PASS"})
+    if not null_rows.empty:
+        issues_frames.append(null_rows.assign(issue="Null core fields"))
+
+    dup_mask = df.duplicated(subset=["year", "region", "variable", "scenario"], keep=False)
+    dup_rows = df[dup_mask]
+    checks.append({"Check": "Duplicate keys (year,region,variable,scenario)", "Count": int(len(dup_rows)), "Status": "FAIL" if len(dup_rows) else "PASS"})
+    if not dup_rows.empty:
+        issues_frames.append(dup_rows.assign(issue="Duplicate key"))
+
+    non_numeric = df[pd.to_numeric(df["value"], errors="coerce").isna()]
+    checks.append({"Check": "Non-numeric values", "Count": int(len(non_numeric)), "Status": "FAIL" if len(non_numeric) else "PASS"})
+    if not non_numeric.empty:
+        issues_frames.append(non_numeric.assign(issue="Non-numeric value"))
+
+    year_order_issues = []
+    for (scenario, region, variable), grp in df.groupby(["scenario", "region", "variable"]):
+        years = sorted(grp["year"].dropna().astype(int).unique().tolist())
+        if len(years) >= 3:
+            gaps = [years[i + 1] - years[i] for i in range(len(years) - 1)]
+            if max(gaps) > 10:
+                year_order_issues.append({"scenario": scenario, "region": region, "variable": variable, "max_gap": max(gaps)})
+    year_gap_df = pd.DataFrame(year_order_issues)
+    checks.append({"Check": "Large year gaps (>10 years)", "Count": int(len(year_gap_df)), "Status": "WARN" if len(year_gap_df) else "PASS"})
+    if not year_gap_df.empty:
+        issues_frames.append(year_gap_df.assign(issue="Large year gap"))
+
+    summary = pd.DataFrame(checks)
+    issues = pd.concat(issues_frames, ignore_index=True) if issues_frames else pd.DataFrame()
+    return summary, issues
+
+
 def generate_synthetic_wells(target_count: int) -> list[WellSite]:
     base = WELLS.copy()
     if target_count <= len(base):
@@ -634,6 +672,14 @@ def render_monitoring_tab(
     q_counts.columns = ["Data Status", "Count"]
     st.caption("Data Status (Observed / Modeled / Mapped / Imputed)")
     st.dataframe(q_counts, use_container_width=True, hide_index=True)
+    with st.expander("Failures & Data Quality", expanded=False):
+        qa_rows = [
+            {"Check": "Missing dates", "Count": int(filtered["date"].isna().sum()), "Status": "FAIL" if filtered["date"].isna().sum() else "PASS"},
+            {"Check": "Missing actual signal", "Count": int(filtered["actual"].isna().sum()), "Status": "FAIL" if filtered["actual"].isna().sum() else "PASS"},
+            {"Check": "Duplicate rows (date,well)", "Count": int(filtered.duplicated(subset=["date", "well"]).sum()), "Status": "FAIL" if filtered.duplicated(subset=["date", "well"]).sum() else "PASS"},
+        ]
+        qa_df = pd.DataFrame(qa_rows)
+        st.dataframe(qa_df, use_container_width=True, hide_index=True)
 
     c1, c2, c3, c4 = st.columns(4)
     latest_all = latest_status_table(filtered, is_crm=is_crm)
@@ -801,6 +847,15 @@ def render_gcam_tab() -> None:
             st.warning(f"Sample file not found: {GCAM_SAMPLE_PATH}")
             return
         gcam_df = load_gcam_data(str(GCAM_SAMPLE_PATH))
+
+    qa_summary, qa_issues = gcam_quality_report(gcam_df)
+    with st.expander("Failures & Data Quality", expanded=False):
+        st.dataframe(qa_summary, use_container_width=True, hide_index=True)
+        if not qa_issues.empty:
+            st.caption("Issue samples")
+            st.dataframe(qa_issues.head(50), use_container_width=True, hide_index=True)
+        else:
+            st.success("No structural data-quality issues detected in current GCAM table.")
 
     region_color_df = None
     if upload_palette:
