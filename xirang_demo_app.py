@@ -96,10 +96,10 @@ CLUSTER_COLORS_HEX = {
     "C4": "#e76f51",  # terracotta
 }
 CLUSTER_NOTES = {
-    "C1": "Latitude >= 56.0",
-    "C2": "53.5 <= Latitude < 56.0",
+    "C1": "Offshore North Sea priority (lon >= -1.5, lat >= 53.8)",
+    "C2": "Northern belt / offshore transition",
     "C3": "Latitude < 53.5 and Longitude < -2.0",
-    "C4": "Latitude < 53.5 and Longitude >= -2.0",
+    "C4": "South/east and part of land-edge coastal belt",
 }
 PROJECT_ROOT = Path(__file__).resolve().parent
 GCAM_SAMPLE_PATH = PROJECT_ROOT / "data" / "gcam" / "gcam_global_sample.csv"
@@ -276,10 +276,22 @@ def generate_synthetic_wells(target_count: int) -> list[WellSite]:
     return expanded
 
 
-def cluster_from_lat_lon(lat: float, lon: float) -> str:
-    """Deterministic C1-C4 zoning using only latitude/longitude thresholds."""
+def cluster_from_lat_lon(lat: float, lon: float, site_type: str = "Onshore") -> str:
+    """Deterministic C1-C4 zoning with offshore-aware geographic rules."""
+    if site_type == "Offshore":
+        # Keep C1 focused on the North Sea offshore corridor.
+        if lon >= -1.5 and lat >= 53.8:
+            return "C1"
+        if lon < -3.5 and lat >= 53.0:
+            return "C2"
+        if lon < -2.5:
+            return "C3"
+        return "C4"
     if lat >= 56.0:
-        return "C1"
+        return "C2"
+    # Include part of land-edge/coastal belt in C4.
+    if lat < 54.2 and lon >= -3.2:
+        return "C4"
     if lat >= 53.5:
         return "C2"
     if lon < -2.0:
@@ -317,7 +329,7 @@ def simulate_well_history(site: WellSite, n_days: int = 180) -> pd.DataFrame:
             "p10": p10,
             "p90": p90,
             "source": "Synthetic UK",
-            "cluster": cluster_from_lat_lon(site.lat, site.lon),
+            "cluster": cluster_from_lat_lon(site.lat, site.lon, site.site_type),
             "site_type": site.site_type,
         }
     )
@@ -386,7 +398,7 @@ def build_crm_dataset() -> pd.DataFrame:
                     "p10": p10[k],
                     "p90": p90[k],
                     "source": "CRM Streak",
-                    "cluster": cluster_from_lat_lon(site.lat, site.lon),
+                    "cluster": cluster_from_lat_lon(site.lat, site.lon, site.site_type),
                     "site_type": site.site_type,
                 }
             )
@@ -715,12 +727,13 @@ def render_monitoring_tab(
         qa_df = pd.DataFrame(qa_rows)
         st.dataframe(qa_df, use_container_width=True, hide_index=True)
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     latest_all = latest_status_table(filtered, is_crm=is_crm)
     c1.metric("Selected Wells", len(selected_wells))
     c2.metric(f"Mean Signal ({signal_unit})", f"{latest_all['actual'].mean():.2f}")
     c3.metric(f"Mean Pressure ({pressure_unit})", f"{latest_all['pressure_bar'].mean():.2f}")
     c4.metric("High Alerts", int((latest_all["alert"] == "HIGH").sum()))
+    c5.metric("Offshore Wells", int((latest_all["site_type"] == "Offshore").sum()))
 
     st.subheader("UK Well Map (Latest Snapshot)")
     map_df = latest_all.copy()
@@ -741,6 +754,20 @@ def render_monitoring_tab(
         line_width_min_pixels=1,
         pickable=True,
     )
+    offshore_df = map_df[map_df["site_type"] == "Offshore"].copy()
+    offshore_df["marker"] = "▲"
+    offshore_layer = pdk.Layer(
+        "TextLayer",
+        data=offshore_df,
+        get_position="[lon, lat]",
+        get_text="marker",
+        get_color=[17, 24, 39, 245],
+        get_size=20,
+        get_angle=0,
+        get_text_anchor="middle",
+        get_alignment_baseline="center",
+        pickable=False,
+    )
     layers = []
     if show_boundaries:
         boundary_data = pd.DataFrame(
@@ -759,6 +786,8 @@ def render_monitoring_tab(
         )
         layers.append(boundary_layer)
     layers.append(point_layer)
+    if not offshore_df.empty:
+        layers.append(offshore_layer)
     tooltip = {
         "html": f"<b>{{well}}</b><br/>Region: {{region}}<br/>Site: {{site_type}}<br/>Cluster: {{cluster}}<br/>Signal ({signal_unit}): {{actual}}<br/>Pressure ({pressure_unit}): {{pressure_bar}}<br/>Alert: {{alert}}",
         "style": {"backgroundColor": "#111827", "color": "white"},
@@ -785,7 +814,7 @@ def render_monitoring_tab(
             x=alt.X("lon:Q", title="Longitude", scale=x_scale),
             y=alt.Y("lat:Q", title="Latitude", scale=y_scale),
             color=alt.Color("alert:N", title="Alert Level", scale=alt.Scale(domain=["OK", "HIGH"], range=["#22c55e", "#dc3545"])),
-            shape=alt.Shape("cluster:N", title="Cluster"),
+            shape=alt.Shape("site_type:N", title="Site Type", scale=alt.Scale(domain=["Onshore", "Offshore"], range=["circle", "triangle-up"])),
             opacity=alt.condition(point_select, alt.value(1.0), alt.value(0.75)),
             tooltip=[
                 "well:N",
