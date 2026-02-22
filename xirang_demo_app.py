@@ -611,6 +611,22 @@ def render_monitoring_tab(
     show_boundaries: bool,
     show_interactive_map: bool,
 ) -> None:
+    time_start = filtered["date"].min().strftime("%Y-%m-%d")
+    time_end = filtered["date"].max().strftime("%Y-%m-%d")
+    source_text = filtered["source"].iloc[0] if "source" in filtered.columns else "Unknown"
+    meta_df = pd.DataFrame(
+        [
+            {
+                "Data Source": source_text,
+                "Time Range": f"{time_start} to {time_end}",
+                "Signal Unit": "proxy / modeled",
+                "Scenario": "Operational Monitoring",
+            }
+        ]
+    )
+    st.caption("Figure Metadata")
+    st.dataframe(meta_df, use_container_width=True, hide_index=True)
+
     c1, c2, c3, c4 = st.columns(4)
     latest_all = latest_status_table(filtered, is_crm=is_crm)
     c1.metric("Selected Wells", len(selected_wells))
@@ -835,6 +851,19 @@ def render_gcam_tab() -> None:
     r1.metric("Variable", sel_variable)
     r2.metric(f"Global Total ({latest_year})", f"{total_latest:,.2f} {unit}")
     r3.metric("Scenarios Selected", len(sel_scenarios))
+
+    g_meta = pd.DataFrame(
+        [
+            {
+                "Data Source": "Uploaded GCAM CSV" if use_uploaded else "Built-in GCAM sample",
+                "Time Range": f"{int(g_filtered['year'].min())} to {int(g_filtered['year'].max())}",
+                "Signal Unit": unit,
+                "Scenario": ", ".join(sel_scenarios),
+            }
+        ]
+    )
+    st.caption("Figure Metadata")
+    st.dataframe(g_meta, use_container_width=True, hide_index=True)
 
     st.markdown("**Trend by Year**")
     trend = (
