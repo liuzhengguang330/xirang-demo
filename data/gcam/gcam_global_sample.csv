@@ -1,0 +1,113 @@
+year,region,variable,value,unit,scenario
+2020,United States,Hydrogen Production,9.2,EJ,Reference
+2030,United States,Hydrogen Production,12.8,EJ,Reference
+2040,United States,Hydrogen Production,16.9,EJ,Reference
+2050,United States,Hydrogen Production,21.7,EJ,Reference
+2020,China,Hydrogen Production,8.5,EJ,Reference
+2030,China,Hydrogen Production,13.7,EJ,Reference
+2040,China,Hydrogen Production,18.8,EJ,Reference
+2050,China,Hydrogen Production,24.2,EJ,Reference
+2020,European Union,Hydrogen Production,6.7,EJ,Reference
+2030,European Union,Hydrogen Production,9.9,EJ,Reference
+2040,European Union,Hydrogen Production,13.5,EJ,Reference
+2050,European Union,Hydrogen Production,17.1,EJ,Reference
+2020,India,Hydrogen Production,3.1,EJ,Reference
+2030,India,Hydrogen Production,5.8,EJ,Reference
+2040,India,Hydrogen Production,9.7,EJ,Reference
+2050,India,Hydrogen Production,14.3,EJ,Reference
+2020,Japan,Hydrogen Production,2.4,EJ,Reference
+2030,Japan,Hydrogen Production,3.3,EJ,Reference
+2040,Japan,Hydrogen Production,4.5,EJ,Reference
+2050,Japan,Hydrogen Production,5.8,EJ,Reference
+2020,United Kingdom,Hydrogen Production,1.2,EJ,Reference
+2030,United Kingdom,Hydrogen Production,2.5,EJ,Reference
+2040,United Kingdom,Hydrogen Production,3.6,EJ,Reference
+2050,United Kingdom,Hydrogen Production,4.7,EJ,Reference
+2020,Brazil,Hydrogen Production,1.4,EJ,Reference
+2030,Brazil,Hydrogen Production,2.6,EJ,Reference
+2040,Brazil,Hydrogen Production,3.9,EJ,Reference
+2050,Brazil,Hydrogen Production,5.1,EJ,Reference
+2020,United States,Hydrogen Production,9.2,EJ,NetZero
+2030,United States,Hydrogen Production,15.6,EJ,NetZero
+2040,United States,Hydrogen Production,24.5,EJ,NetZero
+2050,United States,Hydrogen Production,34.1,EJ,NetZero
+2020,China,Hydrogen Production,8.5,EJ,NetZero
+2030,China,Hydrogen Production,17.2,EJ,NetZero
+2040,China,Hydrogen Production,28.3,EJ,NetZero
+2050,China,Hydrogen Production,40.6,EJ,NetZero
+2020,European Union,Hydrogen Production,6.7,EJ,NetZero
+2030,European Union,Hydrogen Production,12.1,EJ,NetZero
+2040,European Union,Hydrogen Production,19.4,EJ,NetZero
+2050,European Union,Hydrogen Production,27.6,EJ,NetZero
+2020,India,Hydrogen Production,3.1,EJ,NetZero
+2030,India,Hydrogen Production,7.6,EJ,NetZero
+2040,India,Hydrogen Production,14.6,EJ,NetZero
+2050,India,Hydrogen Production,23.9,EJ,NetZero
+2020,Japan,Hydrogen Production,2.4,EJ,NetZero
+2030,Japan,Hydrogen Production,4.5,EJ,NetZero
+2040,Japan,Hydrogen Production,6.8,EJ,NetZero
+2050,Japan,Hydrogen Production,9.2,EJ,NetZero
+2020,United Kingdom,Hydrogen Production,1.2,EJ,NetZero
+2030,United Kingdom,Hydrogen Production,3.2,EJ,NetZero
+2040,United Kingdom,Hydrogen Production,5.6,EJ,NetZero
+2050,United Kingdom,Hydrogen Production,8.4,EJ,NetZero
+2020,Brazil,Hydrogen Production,1.4,EJ,NetZero
+2030,Brazil,Hydrogen Production,3.2,EJ,NetZero
+2040,Brazil,Hydrogen Production,5.4,EJ,NetZero
+2050,Brazil,Hydrogen Production,8.1,EJ,NetZero
+2020,United States,CO2 Emissions,5.1,GtCO2,Reference
+2030,United States,CO2 Emissions,4.9,GtCO2,Reference
+2040,United States,CO2 Emissions,4.7,GtCO2,Reference
+2050,United States,CO2 Emissions,4.6,GtCO2,Reference
+2020,China,CO2 Emissions,10.6,GtCO2,Reference
+2030,China,CO2 Emissions,11.0,GtCO2,Reference
+2040,China,CO2 Emissions,10.4,GtCO2,Reference
+2050,China,CO2 Emissions,9.8,GtCO2,Reference
+2020,European Union,CO2 Emissions,3.3,GtCO2,Reference
+2030,European Union,CO2 Emissions,3.1,GtCO2,Reference
+2040,European Union,CO2 Emissions,2.9,GtCO2,Reference
+2050,European Union,CO2 Emissions,2.8,GtCO2,Reference
+2020,India,CO2 Emissions,2.4,GtCO2,Reference
+2030,India,CO2 Emissions,3.2,GtCO2,Reference
+2040,India,CO2 Emissions,3.9,GtCO2,Reference
+2050,India,CO2 Emissions,4.3,GtCO2,Reference
+2020,Japan,CO2 Emissions,1.1,GtCO2,Reference
+2030,Japan,CO2 Emissions,1.0,GtCO2,Reference
+2040,Japan,CO2 Emissions,0.9,GtCO2,Reference
+2050,Japan,CO2 Emissions,0.8,GtCO2,Reference
+2020,United Kingdom,CO2 Emissions,0.4,GtCO2,Reference
+2030,United Kingdom,CO2 Emissions,0.3,GtCO2,Reference
+2040,United Kingdom,CO2 Emissions,0.2,GtCO2,Reference
+2050,United Kingdom,CO2 Emissions,0.2,GtCO2,Reference
+2020,Brazil,CO2 Emissions,0.5,GtCO2,Reference
+2030,Brazil,CO2 Emissions,0.6,GtCO2,Reference
+2040,Brazil,CO2 Emissions,0.7,GtCO2,Reference
+2050,Brazil,CO2 Emissions,0.8,GtCO2,Reference
+2020,United States,CO2 Emissions,5.1,GtCO2,NetZero
+2030,United States,CO2 Emissions,3.6,GtCO2,NetZero
+2040,United States,CO2 Emissions,1.7,GtCO2,NetZero
+2050,United States,CO2 Emissions,0.4,GtCO2,NetZero
+2020,China,CO2 Emissions,10.6,GtCO2,NetZero
+2030,China,CO2 Emissions,8.4,GtCO2,NetZero
+2040,China,CO2 Emissions,4.9,GtCO2,NetZero
+2050,China,CO2 Emissions,1.6,GtCO2,NetZero
+2020,European Union,CO2 Emissions,3.3,GtCO2,NetZero
+2030,European Union,CO2 Emissions,2.2,GtCO2,NetZero
+2040,European Union,CO2 Emissions,1.0,GtCO2,NetZero
+2050,European Union,CO2 Emissions,0.3,GtCO2,NetZero
+2020,India,CO2 Emissions,2.4,GtCO2,NetZero
+2030,India,CO2 Emissions,2.8,GtCO2,NetZero
+2040,India,CO2 Emissions,2.0,GtCO2,NetZero
+2050,India,CO2 Emissions,0.8,GtCO2,NetZero
+2020,Japan,CO2 Emissions,1.1,GtCO2,NetZero
+2030,Japan,CO2 Emissions,0.7,GtCO2,NetZero
+2040,Japan,CO2 Emissions,0.3,GtCO2,NetZero
+2050,Japan,CO2 Emissions,0.1,GtCO2,NetZero
+2020,United Kingdom,CO2 Emissions,0.4,GtCO2,NetZero
+2030,United Kingdom,CO2 Emissions,0.2,GtCO2,NetZero
+2040,United Kingdom,CO2 Emissions,0.1,GtCO2,NetZero
+2050,United Kingdom,CO2 Emissions,0.0,GtCO2,NetZero
+2020,Brazil,CO2 Emissions,0.5,GtCO2,NetZero
+2030,Brazil,CO2 Emissions,0.4,GtCO2,NetZero
+2040,Brazil,CO2 Emissions,0.2,GtCO2,NetZero
+2050,Brazil,CO2 Emissions,0.1,GtCO2,NetZero

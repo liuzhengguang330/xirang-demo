@@ -3,6 +3,7 @@
 
 from dataclasses import dataclass
 from os.path import join
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -70,6 +71,9 @@ UK_BOUNDARIES = {
         [-8.3, 54.0], [-5.2, 54.0], [-5.2, 55.4], [-8.3, 55.4], [-8.3, 54.0]
     ],
 }
+PROJECT_ROOT = Path(__file__).resolve().parent
+GCAM_SAMPLE_PATH = PROJECT_ROOT / "data" / "gcam" / "gcam_global_sample.csv"
+GCAM_CENTROID_PATH = PROJECT_ROOT / "data" / "gcam" / "region_centroids.csv"
 
 
 def generate_synthetic_wells(target_count: int) -> list[WellSite]:
@@ -319,6 +323,38 @@ def boundary_lines_df() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+@st.cache_data(show_spinner=False)
+def load_gcam_data(path: str) -> pd.DataFrame:
+    df = pd.read_csv(path)
+    required = {"year", "region", "variable", "value", "unit", "scenario"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing required columns: {sorted(missing)}")
+    df = df.copy()
+    df["year"] = df["year"].astype(int)
+    df["value"] = pd.to_numeric(df["value"], errors="coerce")
+    df["region"] = df["region"].astype(str).str.strip()
+    df["variable"] = df["variable"].astype(str).str.strip()
+    df["scenario"] = df["scenario"].astype(str).str.strip()
+    df["unit"] = df["unit"].astype(str).str.strip()
+    df = df.dropna(subset=["value"])
+    return df
+
+
+@st.cache_data(show_spinner=False)
+def load_region_centroids(path: str) -> pd.DataFrame:
+    df = pd.read_csv(path)
+    required = {"region", "lat", "lon"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing centroid columns: {sorted(missing)}")
+    df = df.copy()
+    df["region"] = df["region"].astype(str).str.strip()
+    df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
+    df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
+    return df.dropna(subset=["lat", "lon"])
+
+
 def main() -> None:
     st.set_page_config(page_title="XIRANG Demo", layout="wide")
     st.title("XIRANG (息壤) - Well Monitoring Demo")
@@ -498,6 +534,131 @@ def main() -> None:
 
     st.subheader("Decision Suggestion")
     st.info(recommendation_text(focus))
+
+    st.divider()
+    st.subheader("GCAM Global Explorer")
+    st.caption("Interactive global scenario analytics for GCAM-style outputs")
+
+    use_uploaded = st.checkbox("Upload custom GCAM CSV", value=False)
+    gcam_df = None
+    if use_uploaded:
+        uploaded = st.file_uploader("Upload GCAM CSV", type=["csv"])
+        if uploaded is not None:
+            try:
+                gcam_df = load_gcam_data(uploaded)
+            except Exception as exc:
+                st.error(f"Failed to read uploaded GCAM file: {exc}")
+                return
+    else:
+        if not GCAM_SAMPLE_PATH.exists():
+            st.warning(f"Sample file not found: {GCAM_SAMPLE_PATH}")
+            return
+        gcam_df = load_gcam_data(str(GCAM_SAMPLE_PATH))
+
+    scenarios = sorted(gcam_df["scenario"].unique())
+    variables = sorted(gcam_df["variable"].unique())
+    regions_all = sorted(gcam_df["region"].unique())
+    years = sorted(gcam_df["year"].unique())
+
+    g1, g2, g3, g4 = st.columns(4)
+    sel_scenarios = g1.multiselect("Scenarios", scenarios, default=scenarios[:2] if len(scenarios) > 1 else scenarios)
+    sel_variable = g2.selectbox("Variable", variables, index=0)
+    sel_regions = g3.multiselect("Regions", regions_all, default=regions_all[: min(12, len(regions_all))])
+    sel_year = g4.selectbox("Ranking Year", years, index=len(years) - 1)
+    if not sel_scenarios:
+        st.warning("Please select at least one scenario.")
+        return
+    if not sel_regions:
+        st.warning("Please select at least one region.")
+        return
+
+    g_filtered = gcam_df[
+        (gcam_df["scenario"].isin(sel_scenarios))
+        & (gcam_df["variable"] == sel_variable)
+        & (gcam_df["region"].isin(sel_regions))
+    ].copy()
+    if g_filtered.empty:
+        st.warning("No GCAM data matches current filters.")
+        return
+
+    unit = g_filtered["unit"].iloc[0]
+    latest_year = int(g_filtered["year"].max())
+    total_latest = g_filtered[g_filtered["year"] == latest_year]["value"].sum()
+    r1, r2, r3 = st.columns(3)
+    r1.metric("Variable", sel_variable)
+    r2.metric(f"Global Total ({latest_year})", f"{total_latest:,.2f} {unit}")
+    r3.metric("Scenarios Selected", len(sel_scenarios))
+
+    st.markdown("**Trend by Year**")
+    trend = (
+        alt.Chart(g_filtered)
+        .mark_line(point=True)
+        .encode(
+            x=alt.X("year:O", title="Year"),
+            y=alt.Y("sum(value):Q", title=f"Value ({unit})"),
+            color=alt.Color("scenario:N", title="Scenario"),
+            tooltip=["scenario:N", "year:O", alt.Tooltip("sum(value):Q", title=f"Value ({unit})")],
+        )
+        .properties(height=320)
+    )
+    st.altair_chart(trend, use_container_width=True)
+
+    st.markdown("**Region-Year Heatmap (first selected scenario)**")
+    heat_scenario = sel_scenarios[0]
+    heat_df = g_filtered[g_filtered["scenario"] == heat_scenario]
+    heat = (
+        alt.Chart(heat_df)
+        .mark_rect()
+        .encode(
+            x=alt.X("year:O", title="Year"),
+            y=alt.Y("region:N", sort="-x", title="Region"),
+            color=alt.Color("value:Q", title=unit),
+            tooltip=["region:N", "year:O", alt.Tooltip("value:Q", title=f"Value ({unit})")],
+        )
+        .properties(height=360)
+    )
+    st.altair_chart(heat, use_container_width=True)
+
+    st.markdown("**Regional Ranking**")
+    rank_df = g_filtered[g_filtered["year"] == sel_year].groupby("region", as_index=False)["value"].sum().sort_values("value", ascending=False)
+    bar = (
+        alt.Chart(rank_df.head(20))
+        .mark_bar()
+        .encode(
+            x=alt.X("value:Q", title=f"Value ({unit})"),
+            y=alt.Y("region:N", sort="-x", title="Region"),
+            tooltip=["region:N", alt.Tooltip("value:Q", title=f"Value ({unit})")],
+        )
+        .properties(height=420)
+    )
+    st.altair_chart(bar, use_container_width=True)
+
+    if GCAM_CENTROID_PATH.exists():
+        st.markdown("**Global Region Map (Centroid Bubble)**")
+        centroid = load_region_centroids(str(GCAM_CENTROID_PATH))
+        map_year_df = rank_df.merge(centroid, on="region", how="left").dropna(subset=["lat", "lon"])
+        if not map_year_df.empty:
+            vmax = float(map_year_df["value"].max() + 1e-9)
+            map_year_df["radius"] = 12000 + 50000 * (map_year_df["value"] / vmax)
+            map_layer = pdk.Layer(
+                "ScatterplotLayer",
+                data=map_year_df,
+                get_position="[lon, lat]",
+                get_radius="radius",
+                get_fill_color=[255, 140, 0, 160],
+                pickable=True,
+            )
+            st.pydeck_chart(
+                pdk.Deck(
+                    map_style=None,
+                    initial_view_state=pdk.ViewState(latitude=20, longitude=0, zoom=1.1),
+                    layers=[map_layer],
+                    tooltip={"html": "<b>{region}</b><br/>Value: {value}"},
+                ),
+                use_container_width=True,
+            )
+        else:
+            st.info("No centroid match found for currently selected regions.")
 
 
 if __name__ == "__main__":
