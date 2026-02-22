@@ -107,6 +107,7 @@ GCAM_CENTROID_PATH = PROJECT_ROOT / "data" / "gcam" / "region_centroids.csv"
 GCAM_REGION_COLOR_PATH = PROJECT_ROOT / "data" / "gcam" / "region_colors.csv"
 GCAM_ISO3_PATH = PROJECT_ROOT / "data" / "gcam" / "region_iso3.csv"
 GEOTHERMAL_POTENTIAL_PATH = PROJECT_ROOT / "data" / "geothermal" / "global_geothermal_potential.csv"
+DATA_SCHEMA_VERSION = "2026-02-22-offshore-v1"
 
 I18N = {
     "en": {
@@ -337,13 +338,15 @@ def simulate_well_history(site: WellSite, n_days: int = 180) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def build_synthetic_dataset(target_count: int = 100) -> pd.DataFrame:
+def build_synthetic_dataset(target_count: int = 100, schema_version: str = "v1") -> pd.DataFrame:
+    _ = schema_version
     sites = generate_synthetic_wells(target_count)
     return pd.concat([simulate_well_history(site) for site in sites], ignore_index=True)
 
 
 @st.cache_data(show_spinner=True)
-def build_crm_dataset() -> pd.DataFrame:
+def build_crm_dataset(schema_version: str = "v1") -> pd.DataFrame:
+    _ = schema_version
     filepath = "Datasets/Streak"
     qi = pd.read_excel(join(filepath, "Injection.xlsx"))
     qp = pd.read_excel(join(filepath, "Production.xlsx"))
@@ -1335,7 +1338,15 @@ def main() -> None:
     if not is_crm:
         synthetic_well_count = st.sidebar.slider(tr("synthetic_well_count"), min_value=50, max_value=400, value=200, step=25)
 
-    df = build_crm_dataset() if is_crm else build_synthetic_dataset(synthetic_well_count)
+    if st.sidebar.button("Refresh Data Cache"):
+        st.cache_data.clear()
+        st.rerun()
+
+    df = (
+        build_crm_dataset(DATA_SCHEMA_VERSION)
+        if is_crm
+        else build_synthetic_dataset(synthetic_well_count, DATA_SCHEMA_VERSION)
+    )
     # Backward-compatible guard for cached/legacy tables without site_type.
     if "site_type" not in df.columns:
         df = df.copy()
