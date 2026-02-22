@@ -611,6 +611,10 @@ def render_monitoring_tab(
     show_boundaries: bool,
     show_interactive_map: bool,
 ) -> None:
+    filtered = filtered.copy()
+    if "quality_tag" not in filtered.columns:
+        filtered["quality_tag"] = "Modeled" if is_crm else "Observed"
+
     time_start = filtered["date"].min().strftime("%Y-%m-%d")
     time_end = filtered["date"].max().strftime("%Y-%m-%d")
     source_text = filtered["source"].iloc[0] if "source" in filtered.columns else "Unknown"
@@ -626,6 +630,10 @@ def render_monitoring_tab(
     )
     st.caption("Figure Metadata")
     st.dataframe(meta_df, use_container_width=True, hide_index=True)
+    q_counts = filtered["quality_tag"].value_counts().reset_index()
+    q_counts.columns = ["Data Status", "Count"]
+    st.caption("Data Status (Observed / Modeled / Mapped / Imputed)")
+    st.dataframe(q_counts, use_container_width=True, hide_index=True)
 
     c1, c2, c3, c4 = st.columns(4)
     latest_all = latest_status_table(filtered, is_crm=is_crm)
@@ -916,13 +924,17 @@ def render_gcam_tab() -> None:
 
     st.markdown("**Country Choropleth (GCAM Values)**")
     choropleth_df = rank_df.copy()
+    choropleth_df["data_status"] = "Modeled"
     if "iso3" in g_filtered.columns:
         tmp = g_filtered[g_filtered["year"] == sel_year].groupby(["region", "iso3"], as_index=False)["value"].sum()
         choropleth_df = tmp.copy()
+        choropleth_df["data_status"] = "Observed"
     elif iso3_df is not None:
         choropleth_df = choropleth_df.merge(iso3_df, on="region", how="left")
+        choropleth_df["data_status"] = np.where(choropleth_df["iso3"].notna(), "Mapped", "Modeled")
     else:
         choropleth_df["iso3"] = np.nan
+        choropleth_df["data_status"] = "Modeled"
 
     st.markdown("**Mapping Agent**")
     catalog = iso3_catalog()
@@ -957,8 +969,17 @@ def render_gcam_tab() -> None:
                     lambda row: apply_map.get(row["region"], row["iso3"]) if pd.isna(row["iso3"]) else row["iso3"],
                     axis=1,
                 )
+                choropleth_df["data_status"] = choropleth_df.apply(
+                    lambda row: "Imputed" if (row["region"] in apply_map and row["iso3"] == apply_map[row["region"]]) else row["data_status"],
+                    axis=1,
+                )
     else:
         st.success("All selected regions already mapped to ISO3.")
+
+    status_df = choropleth_df["data_status"].value_counts().reset_index()
+    status_df.columns = ["Data Status", "Count"]
+    st.caption("Data Status (Observed / Modeled / Mapped / Imputed)")
+    st.dataframe(status_df, use_container_width=True, hide_index=True)
 
     valid_map = choropleth_df.dropna(subset=["iso3"]).copy()
     if not valid_map.empty:
