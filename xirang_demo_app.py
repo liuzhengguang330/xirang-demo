@@ -60,17 +60,13 @@ WELLS = [
     WellSite("UK-OF07-NorthSea-G", 54.2500, 0.5000, "North Sea Offshore", "Offshore"),
     WellSite("UK-OF08-NorthSea-H", 53.8500, 0.2000, "North Sea Offshore", "Offshore"),
     WellSite("UK-OF09-IrishSea-A", 54.5000, -4.5000, "Irish Sea Offshore", "Offshore"),
-    WellSite("UK-OF10-IrishSea-B", 53.9000, -4.8000, "Irish Sea Offshore", "Offshore"),
-    WellSite("UK-OF11-IrishSea-C", 53.2000, -5.2000, "Irish Sea Offshore", "Offshore"),
-    WellSite("UK-OF12-CelticSea-A", 50.8000, -6.0000, "Celtic Sea Offshore", "Offshore"),
-    WellSite("UK-OF13-CelticSea-B", 50.4000, -5.2000, "Celtic Sea Offshore", "Offshore"),
 ]
 
 CRM_WELLS = [
     WellSite("P1", 51.5074, -0.1278, "London"),
     WellSite("P2", 53.4808, -2.2426, "North West"),
     WellSite("P3", 56.3000, 0.9000, "North Sea Offshore", "Offshore"),
-    WellSite("P4", 53.6000, -4.9000, "Irish Sea Offshore", "Offshore"),
+    WellSite("P4", 55.4000, 1.2000, "North Sea Offshore", "Offshore"),
 ]
 
 # Coarse country boundary overlays for quick geographic orientation.
@@ -271,7 +267,7 @@ def generate_synthetic_wells(target_count: int) -> list[WellSite]:
         anchor = base[(idx - 1) % len(base)]
         if anchor.site_type == "Offshore":
             # Keep west/south sea basins sparse; most new offshore wells follow North Sea pattern.
-            if "North Sea" not in anchor.region and north_sea_offshore and rng.random() < 0.85:
+            if "North Sea" not in anchor.region and north_sea_offshore and rng.random() < 0.97:
                 anchor = north_sea_offshore[int(rng.integers(0, len(north_sea_offshore)))]
             # Offshore wells are pushed toward real sea basins to better match UKCS-style maps.
             if "North Sea" in anchor.region:
@@ -291,6 +287,9 @@ def generate_synthetic_wells(target_count: int) -> list[WellSite]:
         else:
             lat = float(anchor.lat + rng.normal(0.16, 0.14))
             lon = float(anchor.lon + rng.normal(0.10, 0.16))
+            # Reduce accidental drift of onshore points into the Irish Sea.
+            if lon < -4.2 and lat < 55.8:
+                lon = float(-3.9 + abs(rng.normal(0.0, 0.28)))
             lat = min(max(lat, 49.8), 58.9)
             lon = min(max(lon, -8.1), 1.8)
         expanded.append(WellSite(f"UK-W{idx:03d}-{anchor.region}", lat, lon, anchor.region, anchor.site_type))
