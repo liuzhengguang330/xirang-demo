@@ -260,36 +260,34 @@ def generate_synthetic_wells(target_count: int) -> list[WellSite]:
         return base[:target_count]
 
     rng = np.random.default_rng(20260222)
-    north_sea_offshore = [w for w in base if w.site_type == "Offshore" and "North Sea" in w.region]
     expanded = base.copy()
     idx = len(base) + 1
     while len(expanded) < target_count:
         anchor = base[(idx - 1) % len(base)]
         if anchor.site_type == "Offshore":
-            # Keep west/south sea basins sparse; most new offshore wells follow North Sea pattern.
-            if "North Sea" not in anchor.region and north_sea_offshore and rng.random() < 0.97:
-                anchor = north_sea_offshore[int(rng.integers(0, len(north_sea_offshore)))]
-            # Offshore wells are pushed toward real sea basins to better match UKCS-style maps.
-            if "North Sea" in anchor.region:
-                lat = float(anchor.lat + rng.normal(0.18, 0.32))
-                lon = float(anchor.lon + rng.normal(0.85, 0.55))
-                lon = max(lon, 0.25)
-            elif "Irish Sea" in anchor.region:
-                lat = float(anchor.lat + rng.normal(0.02, 0.20))
-                lon = float(anchor.lon + rng.normal(-0.10, 0.26))
-                lon = min(max(lon, -6.2), -3.4)
-            else:  # Celtic Sea
-                lat = float(anchor.lat + rng.normal(-0.03, 0.16))
-                lon = float(anchor.lon + rng.normal(-0.05, 0.22))
-                lon = min(max(lon, -6.8), -4.4)
-            lat = min(max(lat, 49.6), 60.4)
-            lon = min(max(lon, -8.6), 4.8)
+            # Reference-style offshore layout:
+            # 1) North-east vertical strip (dominant)
+            # 2) Northern cluster above Scotland
+            # 3) Sparse east-central bridge points
+            u = float(rng.random())
+            if u < 0.72:
+                lat = float(rng.uniform(53.8, 59.2))
+                lon = float(rng.normal(1.15, 0.28))
+            elif u < 0.92:
+                lat = float(rng.normal(60.1, 0.30))
+                lon = float(rng.normal(1.35, 0.35))
+            else:
+                lat = float(rng.normal(56.8, 0.25))
+                lon = float(rng.normal(0.25, 0.40))
+            lat = min(max(lat, 52.9), 60.8)
+            lon = min(max(lon, -0.7), 3.2)
+            anchor = WellSite(anchor.name, lat, lon, "North Sea Offshore", "Offshore")
         else:
             lat = float(anchor.lat + rng.normal(0.16, 0.14))
             lon = float(anchor.lon + rng.normal(0.10, 0.16))
-            # Reduce accidental drift of onshore points into the Irish Sea.
-            if lon < -4.2 and lat < 55.8:
-                lon = float(-3.9 + abs(rng.normal(0.0, 0.28)))
+            # Keep onshore points from drifting into the Irish Sea.
+            if lon < -3.9 and lat < 56.0:
+                lon = float(-3.7 + abs(rng.normal(0.0, 0.22)))
             lat = min(max(lat, 49.8), 58.9)
             lon = min(max(lon, -8.1), 1.8)
         expanded.append(WellSite(f"UK-W{idx:03d}-{anchor.region}", lat, lon, anchor.region, anchor.site_type))
