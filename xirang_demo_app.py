@@ -74,6 +74,7 @@ UK_BOUNDARIES = {
 PROJECT_ROOT = Path(__file__).resolve().parent
 GCAM_SAMPLE_PATH = PROJECT_ROOT / "data" / "gcam" / "gcam_global_sample.csv"
 GCAM_CENTROID_PATH = PROJECT_ROOT / "data" / "gcam" / "region_centroids.csv"
+GCAM_REGION_COLOR_PATH = PROJECT_ROOT / "data" / "gcam" / "region_colors.csv"
 
 
 def generate_synthetic_wells(target_count: int) -> list[WellSite]:
@@ -355,6 +356,32 @@ def load_region_centroids(path: str) -> pd.DataFrame:
     return df.dropna(subset=["lat", "lon"])
 
 
+@st.cache_data(show_spinner=False)
+def load_region_colors(path: str) -> pd.DataFrame:
+    df = pd.read_csv(path)
+    required = {"region", "color_hex"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing color columns: {sorted(missing)}")
+    df = df.copy()
+    df["region"] = df["region"].astype(str).str.strip()
+    df["color_hex"] = df["color_hex"].astype(str).str.strip()
+    return df
+
+
+def hex_to_rgba(color_hex: str, alpha: int = 220) -> list[int]:
+    c = color_hex.strip().lstrip("#")
+    if len(c) != 6:
+        return [255, 140, 0, alpha]
+    try:
+        r = int(c[0:2], 16)
+        g = int(c[2:4], 16)
+        b = int(c[4:6], 16)
+        return [r, g, b, alpha]
+    except ValueError:
+        return [255, 140, 0, alpha]
+
+
 def render_monitoring_tab(
     filtered: pd.DataFrame,
     selected_wells: list[str],
@@ -499,6 +526,8 @@ def render_gcam_tab() -> None:
     st.caption("Interactive global scenario analytics for GCAM-style outputs")
 
     use_uploaded = st.checkbox("Upload custom GCAM CSV", value=False)
+    use_region_palette = st.checkbox("Use GCAM Region Colors", value=True)
+    upload_palette = st.checkbox("Upload custom region color mapping (CSV)", value=False)
     gcam_df = None
     if use_uploaded:
         uploaded = st.file_uploader("Upload GCAM CSV", type=["csv"])
@@ -513,6 +542,18 @@ def render_gcam_tab() -> None:
             st.warning(f"Sample file not found: {GCAM_SAMPLE_PATH}")
             return
         gcam_df = load_gcam_data(str(GCAM_SAMPLE_PATH))
+
+    region_color_df = None
+    if upload_palette:
+        color_file = st.file_uploader("Upload region color CSV (columns: region,color_hex)", type=["csv"], key="region_colors")
+        if color_file is not None:
+            try:
+                region_color_df = load_region_colors(color_file)
+            except Exception as exc:
+                st.error(f"Failed to read region color file: {exc}")
+                return
+    elif GCAM_REGION_COLOR_PATH.exists():
+        region_color_df = load_region_colors(str(GCAM_REGION_COLOR_PATH))
 
     scenarios = sorted(gcam_df["scenario"].unique())
     variables = sorted(gcam_df["variable"].unique())
@@ -580,12 +621,17 @@ def render_gcam_tab() -> None:
 
     st.markdown("**Regional Ranking**")
     rank_df = g_filtered[g_filtered["year"] == sel_year].groupby("region", as_index=False)["value"].sum().sort_values("value", ascending=False)
+    if use_region_palette and region_color_df is not None:
+        rank_df = rank_df.merge(region_color_df, on="region", how="left")
+    else:
+        rank_df["color_hex"] = "#f59e0b"
     bar = (
         alt.Chart(rank_df.head(20))
         .mark_bar()
         .encode(
             x=alt.X("value:Q", title=f"Value ({unit})"),
             y=alt.Y("region:N", sort="-x", title="Region"),
+            color=alt.Color("color_hex:N", scale=None, legend=None),
             tooltip=["region:N", alt.Tooltip("value:Q", title=f"Value ({unit})")],
         )
         .properties(height=420)
@@ -598,19 +644,22 @@ def render_gcam_tab() -> None:
         map_year_df = rank_df.merge(centroid, on="region", how="left").dropna(subset=["lat", "lon"])
         if not map_year_df.empty:
             vmax = float(map_year_df["value"].max() + 1e-9)
-            # Strong visual emphasis: larger bubbles + value-based color bands.
+            # Strong visual emphasis: larger bubbles + optional region palette.
             map_year_df["norm"] = map_year_df["value"] / vmax
             map_year_df["radius"] = 60000 + 240000 * np.power(map_year_df["norm"], 0.7)
-            def _color_from_norm(x: float) -> list[int]:
-                if x < 0.25:
-                    return [59, 130, 246, 210]  # blue
-                if x < 0.5:
-                    return [34, 197, 94, 220]   # green
-                if x < 0.75:
-                    return [250, 204, 21, 225]  # yellow
-                return [239, 68, 68, 235]       # red
+            if use_region_palette and "color_hex" in map_year_df.columns:
+                map_year_df["color"] = map_year_df["color_hex"].fillna("#f59e0b").apply(lambda x: hex_to_rgba(x, 230))
+            else:
+                def _color_from_norm(x: float) -> list[int]:
+                    if x < 0.25:
+                        return [59, 130, 246, 210]  # blue
+                    if x < 0.5:
+                        return [34, 197, 94, 220]   # green
+                    if x < 0.75:
+                        return [250, 204, 21, 225]  # yellow
+                    return [239, 68, 68, 235]       # red
 
-            map_year_df["color"] = map_year_df["norm"].apply(_color_from_norm)
+                map_year_df["color"] = map_year_df["norm"].apply(_color_from_norm)
             map_year_df["rank"] = map_year_df["value"].rank(method="dense", ascending=False).astype(int)
             map_layer = pdk.Layer(
                 "ScatterplotLayer",
@@ -635,14 +684,18 @@ def render_gcam_tab() -> None:
                 ),
                 use_container_width=True,
             )
-            legend_df = pd.DataFrame(
-                {
-                    "Band": ["Low", "Medium", "High", "Very High"],
-                    "Normalized Value": ["<25%", "25%-50%", "50%-75%", ">=75%"],
-                    "Color": ["Blue", "Green", "Yellow", "Red"],
-                }
-            )
-            st.dataframe(legend_df, use_container_width=True, hide_index=True)
+            if use_region_palette and "color_hex" in map_year_df.columns:
+                legend_df = map_year_df[["region", "color_hex"]].drop_duplicates().head(20)
+                st.dataframe(legend_df, use_container_width=True, hide_index=True)
+            else:
+                legend_df = pd.DataFrame(
+                    {
+                        "Band": ["Low", "Medium", "High", "Very High"],
+                        "Normalized Value": ["<25%", "25%-50%", "50%-75%", ">=75%"],
+                        "Color": ["Blue", "Green", "Yellow", "Red"],
+                    }
+                )
+                st.dataframe(legend_df, use_container_width=True, hide_index=True)
         else:
             st.info("No centroid match found for currently selected regions.")
 
