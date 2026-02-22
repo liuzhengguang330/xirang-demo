@@ -69,8 +69,8 @@ WELLS = [
 CRM_WELLS = [
     WellSite("P1", 51.5074, -0.1278, "London"),
     WellSite("P2", 53.4808, -2.2426, "North West"),
-    WellSite("P3", 52.4862, -1.8904, "West Midlands"),
-    WellSite("P4", 55.8642, -4.2518, "Scotland"),
+    WellSite("P3", 56.3000, 0.9000, "North Sea Offshore", "Offshore"),
+    WellSite("P4", 53.6000, -4.9000, "Irish Sea Offshore", "Offshore"),
 ]
 
 # Coarse country boundary overlays for quick geographic orientation.
