@@ -79,6 +79,12 @@ CLUSTER_COLORS_HEX = {
     "C3": "#e9c46a",  # amber
     "C4": "#e76f51",  # terracotta
 }
+CLUSTER_NOTES = {
+    "C1": "North Scotland / far-north offshore window",
+    "C2": "North-Central transition window",
+    "C3": "South-West onshore/offshore window",
+    "C4": "South-East and near-sea window",
+}
 PROJECT_ROOT = Path(__file__).resolve().parent
 GCAM_SAMPLE_PATH = PROJECT_ROOT / "data" / "gcam" / "gcam_global_sample.csv"
 GCAM_CENTROID_PATH = PROJECT_ROOT / "data" / "gcam" / "region_centroids.csv"
@@ -106,14 +112,38 @@ def generate_synthetic_wells(target_count: int) -> list[WellSite]:
 
 
 def cluster_from_lat_lon(lat: float, lon: float) -> str:
-    # UK demo partition inspired by C1-C4 style zones.
-    if lat >= 55.3:
-        return "C4"
-    if lat >= 53.2:
-        return "C3"
-    if lon <= -3.2:
+    """
+    C1-C4 zoning aligned to the paper-style UK map windows (approximation):
+    - C1: far north / north Scotland and nearby offshore
+    - C2: north-central transition belt
+    - C3: south-west belt
+    - C4: south-east / east-south offshore belt
+    """
+    # 1) Hard windows first (close to the figure's spatial split).
+    if lat >= 57.2:
+        return "C1"
+    if 54.6 <= lat < 57.2 and lon <= -1.5:
         return "C2"
-    return "C1"
+    if lat < 53.4 and lon <= -2.6:
+        return "C3"
+    if lat < 53.8 and lon > -2.6:
+        return "C4"
+
+    # 2) Fallback by nearest cluster anchor (for boundary points).
+    anchors = {
+        "C1": (58.1, -2.0),
+        "C2": (55.6, -3.0),
+        "C3": (51.9, -4.2),
+        "C4": (51.6, -0.6),
+    }
+    best = None
+    best_dist = 1e18
+    for k, (a_lat, a_lon) in anchors.items():
+        d = (lat - a_lat) ** 2 + (lon - a_lon) ** 2
+        if d < best_dist:
+            best = k
+            best_dist = d
+    return best if best is not None else "C2"
 
 
 def simulate_well_history(site: WellSite, n_days: int = 180) -> pd.DataFrame:
@@ -546,7 +576,7 @@ def render_monitoring_tab(
     )
     st.dataframe(latest_all.reset_index(drop=True), use_container_width=True)
     cluster_legend = pd.DataFrame(
-        [{"Cluster": k, "Color": v} for k, v in CLUSTER_COLORS_HEX.items()]
+        [{"Cluster": k, "Color": v, "Zone Logic": CLUSTER_NOTES.get(k, "")} for k, v in CLUSTER_COLORS_HEX.items()]
     )
     st.dataframe(cluster_legend, use_container_width=True, hide_index=True)
 
