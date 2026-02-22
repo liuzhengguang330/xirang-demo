@@ -968,37 +968,34 @@ def main() -> None:
         label_visibility="collapsed",
     )
 
-    st.markdown(
-        """
-        <style>
-        .xirang-title {
-            font-size: 4.0rem;
-            font-weight: 800;
-            line-height: 1.05;
-            margin: 0.1rem 0 0.2rem 0;
-            color: #1f2937;
-            letter-spacing: 0.5px;
-        }
-        .xirang-subtitle {
-            font-size: 1.55rem;
-            font-weight: 600;
-            color: #475569;
-            margin-bottom: 1.2rem;
-        }
-        .stTabs [data-baseweb="tab"] {
-            font-size: 1.45rem;
-            font-weight: 800;
-            min-height: 58px;
-            padding-top: 0.35rem;
-            padding-bottom: 0.35rem;
-        }
-        </style>
-        <div class="xirang-title">息壤</div>
-        <div class="xirang-subtitle">%s</div>
-        """,
-        unsafe_allow_html=True
-        % tr("subtitle"),
-    )
+    banner_html = """
+    <style>
+    .xirang-title {
+        font-size: 4.0rem;
+        font-weight: 800;
+        line-height: 1.05;
+        margin: 0.1rem 0 0.2rem 0;
+        color: #1f2937;
+        letter-spacing: 0.5px;
+    }
+    .xirang-subtitle {
+        font-size: 1.55rem;
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 1.2rem;
+    }
+    .stTabs [data-baseweb="tab"] {
+        font-size: 1.45rem;
+        font-weight: 800;
+        min-height: 58px;
+        padding-top: 0.35rem;
+        padding-bottom: 0.35rem;
+    }
+    </style>
+    <div class="xirang-title">息壤</div>
+    <div class="xirang-subtitle">%s</div>
+    """ % tr("subtitle")
+    st.markdown(banner_html, unsafe_allow_html=True)
 
     st.sidebar.header(tr("data_source"))
     source = st.sidebar.radio(tr("choose_source"), options=["Synthetic UK", "CRM Streak"], index=0)
