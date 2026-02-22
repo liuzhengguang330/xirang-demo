@@ -104,7 +104,7 @@ GCAM_REGION_COLOR_PATH = PROJECT_ROOT / "data" / "gcam" / "region_colors.csv"
 GCAM_ISO3_PATH = PROJECT_ROOT / "data" / "gcam" / "region_iso3.csv"
 GEOTHERMAL_POTENTIAL_PATH = PROJECT_ROOT / "data" / "geothermal" / "global_geothermal_potential.csv"
 DATA_SCHEMA_VERSION = "2026-02-22-offshore-v1"
-BUILD_TAG = "map-tune-v2"
+BUILD_TAG = "map-template-v1"
 
 I18N = {
     "en": {
@@ -266,22 +266,32 @@ def generate_synthetic_wells(target_count: int) -> list[WellSite]:
     while len(expanded) < target_count:
         anchor = base[(idx - 1) % len(base)]
         if anchor.site_type == "Offshore":
-            # Reference-style offshore layout:
-            # 1) East/North Sea belt (dominant, dispersed)
-            # 2) Northern cluster above Scotland
-            # 3) Small east-central bridge points
+            # Hard-template offshore geometry: closest to reference paper layout.
+            east_strip = [
+                (53.9, 1.05), (54.3, 1.15), (54.8, 1.25), (55.2, 1.35), (55.7, 1.45),
+                (56.1, 1.55), (56.6, 1.62), (57.1, 1.68), (57.6, 1.72), (58.1, 1.78), (58.7, 1.85),
+            ]
+            north_cluster = [
+                (59.6, 1.20), (59.8, 1.40), (60.0, 1.60), (60.2, 1.75), (60.3, 1.35), (60.1, 1.95),
+            ]
+            bridge = [
+                (56.3, 0.45), (56.6, 0.70), (56.9, 0.90), (57.2, 1.00),
+            ]
             u = float(rng.random())
-            if u < 0.78:
-                lat = float(rng.uniform(53.7, 59.4))
-                lon = float(rng.normal(1.35, 0.45))
-            elif u < 0.96:
-                lat = float(rng.normal(60.0, 0.33))
-                lon = float(rng.normal(1.55, 0.40))
+            if u < 0.76:
+                clat, clon = east_strip[int(rng.integers(0, len(east_strip)))]
+                lat = float(rng.normal(clat, 0.15))
+                lon = float(rng.normal(clon, 0.12))
+            elif u < 0.95:
+                clat, clon = north_cluster[int(rng.integers(0, len(north_cluster)))]
+                lat = float(rng.normal(clat, 0.14))
+                lon = float(rng.normal(clon, 0.14))
             else:
-                lat = float(rng.normal(56.7, 0.28))
-                lon = float(rng.normal(0.55, 0.35))
-            lat = min(max(lat, 52.9), 60.8)
-            lon = min(max(lon, -0.2), 3.6)
+                clat, clon = bridge[int(rng.integers(0, len(bridge)))]
+                lat = float(rng.normal(clat, 0.12))
+                lon = float(rng.normal(clon, 0.16))
+            lat = min(max(lat, 53.1), 60.8)
+            lon = min(max(lon, 0.0), 3.1)
             anchor = WellSite(anchor.name, lat, lon, "North Sea Offshore", "Offshore")
         else:
             lat = float(anchor.lat + rng.normal(0.16, 0.14))
