@@ -355,55 +355,13 @@ def load_region_centroids(path: str) -> pd.DataFrame:
     return df.dropna(subset=["lat", "lon"])
 
 
-def main() -> None:
-    st.set_page_config(page_title="XIRANG Demo", layout="wide")
-    st.title("XIRANG (息壤) - Well Monitoring Demo")
-    st.caption("eXplainable Intelligent Resilience Agent Network for Geothermal systems")
-
-    st.sidebar.header("Data Source")
-    source = st.sidebar.radio("Choose source", options=["Synthetic UK", "CRM Streak"], index=0)
-    is_crm = source == "CRM Streak"
-
-    synthetic_well_count = 100
-    if not is_crm:
-        synthetic_well_count = st.sidebar.slider("Synthetic Well Count", min_value=25, max_value=200, value=100, step=25)
-
-    df = build_crm_dataset() if is_crm else build_synthetic_dataset(synthetic_well_count)
-    wells = sorted(df["well"].unique())
-    min_date = df["date"].min().date()
-    max_date = df["date"].max().date()
-
-    st.sidebar.header("Dashboard Filters")
-    regions = sorted(df["region"].unique())
-    selected_regions = st.sidebar.multiselect("Regions", options=regions, default=regions)
-    search = st.sidebar.text_input("Well Search", value="").strip().lower()
-    candidate_wells = [w for w in wells if df[df["well"] == w]["region"].iloc[0] in selected_regions]
-    if search:
-        candidate_wells = [w for w in candidate_wells if search in w.lower()]
-    default_wells = candidate_wells[: min(8, len(candidate_wells))]
-    selected_wells = st.sidebar.multiselect("Wells", options=candidate_wells, default=default_wells)
-    date_range = st.sidebar.date_input("Date Range", value=(min_date, max_date), min_value=min_date, max_value=max_date)
-    show_boundaries = st.sidebar.checkbox("Show UK Country Boundaries", value=True)
-    show_interactive_map = st.sidebar.checkbox("Interactive Map Layer", value=True)
-
-    if not selected_wells:
-        st.warning("Please select at least one well.")
-        return
-    if not isinstance(date_range, tuple) or len(date_range) != 2:
-        st.warning("Please select a valid start and end date.")
-        return
-
-    start_date, end_date = date_range
-    mask = (
-        df["well"].isin(selected_wells)
-        & (df["date"].dt.date >= start_date)
-        & (df["date"].dt.date <= end_date)
-    )
-    filtered = df.loc[mask].copy()
-    if filtered.empty:
-        st.warning("No data in the selected range.")
-        return
-
+def render_monitoring_tab(
+    filtered: pd.DataFrame,
+    selected_wells: list[str],
+    is_crm: bool,
+    show_boundaries: bool,
+    show_interactive_map: bool,
+) -> None:
     c1, c2, c3, c4 = st.columns(4)
     latest_all = latest_status_table(filtered, is_crm=is_crm)
     c1.metric("Selected Wells", len(selected_wells))
@@ -535,7 +493,8 @@ def main() -> None:
     st.subheader("Decision Suggestion")
     st.info(recommendation_text(focus))
 
-    st.divider()
+
+def render_gcam_tab() -> None:
     st.subheader("GCAM Global Explorer")
     st.caption("Interactive global scenario analytics for GCAM-style outputs")
 
@@ -659,6 +618,67 @@ def main() -> None:
             )
         else:
             st.info("No centroid match found for currently selected regions.")
+
+
+def main() -> None:
+    st.set_page_config(page_title="XIRANG Demo", layout="wide")
+    st.title("XIRANG (息壤) - Well Monitoring Demo")
+    st.caption("eXplainable Intelligent Resilience Agent Network for Geothermal systems")
+
+    st.sidebar.header("Data Source")
+    source = st.sidebar.radio("Choose source", options=["Synthetic UK", "CRM Streak"], index=0)
+    is_crm = source == "CRM Streak"
+
+    synthetic_well_count = 100
+    if not is_crm:
+        synthetic_well_count = st.sidebar.slider("Synthetic Well Count", min_value=25, max_value=200, value=100, step=25)
+
+    df = build_crm_dataset() if is_crm else build_synthetic_dataset(synthetic_well_count)
+    wells = sorted(df["well"].unique())
+    min_date = df["date"].min().date()
+    max_date = df["date"].max().date()
+
+    st.sidebar.header("Dashboard Filters")
+    regions = sorted(df["region"].unique())
+    selected_regions = st.sidebar.multiselect("Regions", options=regions, default=regions)
+    search = st.sidebar.text_input("Well Search", value="").strip().lower()
+    candidate_wells = [w for w in wells if df[df["well"] == w]["region"].iloc[0] in selected_regions]
+    if search:
+        candidate_wells = [w for w in candidate_wells if search in w.lower()]
+    default_wells = candidate_wells[: min(8, len(candidate_wells))]
+    selected_wells = st.sidebar.multiselect("Wells", options=candidate_wells, default=default_wells)
+    date_range = st.sidebar.date_input("Date Range", value=(min_date, max_date), min_value=min_date, max_value=max_date)
+    show_boundaries = st.sidebar.checkbox("Show UK Country Boundaries", value=True)
+    show_interactive_map = st.sidebar.checkbox("Interactive Map Layer", value=True)
+
+    tab_monitor, tab_gcam = st.tabs(["XIRANG Monitoring", "GCAM Global Explorer"])
+
+    with tab_monitor:
+        if not selected_wells:
+            st.warning("Please select at least one well.")
+        elif not isinstance(date_range, tuple) or len(date_range) != 2:
+            st.warning("Please select a valid start and end date.")
+        else:
+            start_date, end_date = date_range
+            mask = (
+                df["well"].isin(selected_wells)
+                & (df["date"].dt.date >= start_date)
+                & (df["date"].dt.date <= end_date)
+            )
+            filtered = df.loc[mask].copy()
+            if filtered.empty:
+                st.warning("No data in the selected range.")
+            else:
+                render_monitoring_tab(
+                    filtered=filtered,
+                    selected_wells=selected_wells,
+                    is_crm=is_crm,
+                    show_boundaries=show_boundaries,
+                    show_interactive_map=show_interactive_map,
+                )
+
+    with tab_gcam:
+        render_gcam_tab()
 
 
 if __name__ == "__main__":
