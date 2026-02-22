@@ -115,6 +115,7 @@ I18N = {
         "need_one_well": "Please select at least one well.",
         "need_valid_date": "Please select a valid start and end date.",
         "no_data_range": "No data in the selected range.",
+        "metrics_dict": "Metrics Dictionary",
     },
     "zh": {
         "subtitle": "eXplainable Intelligent Resilience Agent Network for Geothermal systems",
@@ -137,6 +138,7 @@ I18N = {
         "need_one_well": "请至少选择一口井。",
         "need_valid_date": "请选择有效的起止日期。",
         "no_data_range": "该时间范围无数据。",
+        "metrics_dict": "指标字典",
     },
 }
 
@@ -144,6 +146,48 @@ I18N = {
 def tr(key: str) -> str:
     lang = st.session_state.get("lang", "en")
     return I18N.get(lang, I18N["en"]).get(key, key)
+
+
+def metrics_dictionary_df() -> pd.DataFrame:
+    rows = [
+        {
+            "Metric": "flow_m3h",
+            "Unit": "m3/h",
+            "Definition": "Injection/flow proxy used in UK monitoring series.",
+            "Source": "Synthetic UK generator or CRM-derived aggregate injection",
+        },
+        {
+            "Metric": "pressure_bar",
+            "Unit": "bar",
+            "Definition": "Pressure signal used for alert and agent checks.",
+            "Source": "Synthetic proxy or scaled production-derived proxy (CRM mode)",
+        },
+        {
+            "Metric": "actual",
+            "Unit": "signal-dependent",
+            "Definition": "Observed series (temperature-like in synthetic mode; production in CRM mode).",
+            "Source": "Synthetic UK data or Streak Production.xlsx",
+        },
+        {
+            "Metric": "pred / p10 / p90",
+            "Unit": "same as actual",
+            "Definition": "Model prediction and uncertainty band.",
+            "Source": "CRM fit/prediction or synthetic trend model",
+        },
+        {
+            "Metric": "value (GCAM)",
+            "Unit": "scenario dependent (e.g., EJ, GtCO2)",
+            "Definition": "GCAM output value for selected variable/region/year.",
+            "Source": "Uploaded GCAM CSV or built-in sample",
+        },
+        {
+            "Metric": "potential_mwe",
+            "Unit": "MWe",
+            "Definition": "Estimated geothermal power potential at country level.",
+            "Source": "Uploaded geothermal potential CSV or built-in sample",
+        },
+    ]
+    return pd.DataFrame(rows)
 
 
 def generate_synthetic_wells(target_count: int) -> list[WellSite]:
@@ -662,7 +706,7 @@ def render_monitoring_tab(
     )
     st.dataframe(latest_all.reset_index(drop=True), use_container_width=True)
     cluster_legend = pd.DataFrame(
-        [{"Cluster": k, "Color": v, "Zone Logic": CLUSTER_NOTES.get(k, "")} for k, v in CLUSTER_COLORS_HEX.items()]
+        [{"Cluster": k, "Zone Logic": CLUSTER_NOTES.get(k, "")} for k in CLUSTER_COLORS_HEX.keys()]
     )
     st.dataframe(cluster_legend, use_container_width=True, hide_index=True)
 
@@ -1046,6 +1090,8 @@ def main() -> None:
         index=0 if st.session_state.get("lang", "en") == "en" else 1,
         label_visibility="collapsed",
     )
+    with st.sidebar.expander(tr("metrics_dict"), expanded=False):
+        st.dataframe(metrics_dictionary_df(), use_container_width=True, hide_index=True)
 
     banner_html = """
     <style>
@@ -1104,7 +1150,7 @@ def main() -> None:
         candidate_wells = [w for w in wells if df[df["well"] == w]["region"].iloc[0] in selected_groups]
     if search:
         candidate_wells = [w for w in candidate_wells if search in w.lower()]
-    default_wells = candidate_wells[: min(8, len(candidate_wells))]
+    default_wells = candidate_wells
     selected_wells = st.sidebar.multiselect(tr("wells"), options=candidate_wells, default=default_wells)
     date_range = st.sidebar.date_input(tr("date_range"), value=(min_date, max_date), min_value=min_date, max_value=max_date)
     show_boundaries = st.sidebar.checkbox(tr("show_boundaries"), value=True)
