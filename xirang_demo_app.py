@@ -662,6 +662,9 @@ def render_monitoring_tab(
     show_interactive_map: bool,
 ) -> None:
     filtered = filtered.copy()
+    signal_unit = "a.u."
+    flow_unit = "m3/h"
+    pressure_unit = "bar"
     if "quality_tag" not in filtered.columns:
         filtered["quality_tag"] = "Modeled" if is_crm else "Observed"
 
@@ -696,8 +699,8 @@ def render_monitoring_tab(
     c1, c2, c3, c4 = st.columns(4)
     latest_all = latest_status_table(filtered, is_crm=is_crm)
     c1.metric("Selected Wells", len(selected_wells))
-    c2.metric("Mean Signal", f"{latest_all['actual'].mean():.2f}")
-    c3.metric("Mean Pressure (bar)", f"{latest_all['pressure_bar'].mean():.2f}")
+    c2.metric(f"Mean Signal ({signal_unit})", f"{latest_all['actual'].mean():.2f}")
+    c3.metric(f"Mean Pressure ({pressure_unit})", f"{latest_all['pressure_bar'].mean():.2f}")
     c4.metric("High Alerts", int((latest_all["alert"] == "HIGH").sum()))
 
     st.subheader("UK Well Map (Latest Snapshot)")
@@ -738,7 +741,7 @@ def render_monitoring_tab(
         layers.append(boundary_layer)
     layers.append(point_layer)
     tooltip = {
-        "html": "<b>{well}</b><br/>Region: {region}<br/>Cluster: {cluster}<br/>Signal: {actual}<br/>Pressure: {pressure_bar}<br/>Alert: {alert}",
+        "html": f"<b>{{well}}</b><br/>Region: {{region}}<br/>Cluster: {{cluster}}<br/>Signal ({signal_unit}): {{actual}}<br/>Pressure ({pressure_unit}): {{pressure_bar}}<br/>Alert: {{alert}}",
         "style": {"backgroundColor": "#111827", "color": "white"},
     }
     if show_interactive_map:
@@ -762,10 +765,18 @@ def render_monitoring_tab(
         .encode(
             x=alt.X("lon:Q", title="Longitude", scale=x_scale),
             y=alt.Y("lat:Q", title="Latitude", scale=y_scale),
-            color=alt.Color("alert:N", scale=alt.Scale(domain=["OK", "HIGH"], range=["#22c55e", "#dc3545"])),
+            color=alt.Color("alert:N", title="Alert Level", scale=alt.Scale(domain=["OK", "HIGH"], range=["#22c55e", "#dc3545"])),
             shape=alt.Shape("cluster:N", title="Cluster"),
             opacity=alt.condition(point_select, alt.value(1.0), alt.value(0.75)),
-            tooltip=["well:N", "region:N", "cluster:N", "alert:N", "actual:Q", "pressure_bar:Q"],
+            tooltip=[
+                "well:N",
+                "region:N",
+                "cluster:N",
+                "alert:N",
+                alt.Tooltip("actual:Q", title=f"Signal ({signal_unit})", format=".2f"),
+                alt.Tooltip("flow_m3h:Q", title=f"Flow ({flow_unit})", format=".2f"),
+                alt.Tooltip("pressure_bar:Q", title=f"Pressure ({pressure_unit})", format=".2f"),
+            ],
         )
         .add_params(point_select)
     )
@@ -963,7 +974,7 @@ def render_gcam_tab() -> None:
         .encode(
             x=alt.X("year:O", title="Year"),
             y=alt.Y("region:N", sort="-x", title="Region"),
-            color=alt.Color("value:Q", title=unit),
+            color=alt.Color("value:Q", title=f"Value ({unit})"),
             tooltip=["region:N", "year:O", alt.Tooltip("value:Q", title=f"Value ({unit})")],
         )
         .properties(height=360)
@@ -1060,7 +1071,7 @@ def render_gcam_tab() -> None:
             projection="natural earth",
             title=f"{sel_variable} ({sel_year}, {heat_scenario if sel_scenarios else ''})",
         )
-        fig.update_layout(margin=dict(l=0, r=0, t=45, b=0), coloraxis_colorbar_title=unit)
+        fig.update_layout(margin=dict(l=0, r=0, t=45, b=0), coloraxis_colorbar_title=f"Value ({unit})")
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No valid ISO3 mapping found. Upload mapping CSV or include `iso3` in your GCAM data.")
@@ -1101,7 +1112,7 @@ def render_gcam_tab() -> None:
                     initial_view_state=pdk.ViewState(latitude=20, longitude=0, zoom=1.1),
                     layers=[map_layer],
                     tooltip={
-                        "html": "<b>{region}</b><br/>Rank: {rank}<br/>Value: {value}",
+                        "html": f"<b>{{region}}</b><br/>Rank: {{rank}}<br/>Value ({unit}): {{value}}",
                         "style": {"backgroundColor": "#111827", "color": "white"},
                     },
                 ),
@@ -1171,7 +1182,7 @@ def render_gcam_tab() -> None:
                 projection="natural earth",
                 title="Estimated Geothermal Potential (MWe)",
             )
-            fig_pot.update_layout(margin=dict(l=0, r=0, t=45, b=0), coloraxis_colorbar_title="MWe")
+            fig_pot.update_layout(margin=dict(l=0, r=0, t=45, b=0), coloraxis_colorbar_title="Potential (MWe)")
             st.plotly_chart(fig_pot, use_container_width=True)
 
             top_pot = pot_view.sort_values("potential_mwe", ascending=False).head(15)
@@ -1182,7 +1193,7 @@ def render_gcam_tab() -> None:
                     x=alt.X("potential_mwe:Q", title="Potential (MWe)"),
                     y=alt.Y("region:N", sort="-x", title="Region"),
                     color=alt.Color("potential_mwe:Q", scale=alt.Scale(scheme="yelloworangered"), legend=None),
-                    tooltip=["region:N", "iso3:N", alt.Tooltip("potential_mwe:Q", title="MWe"), "category:N"],
+                    tooltip=["region:N", "iso3:N", alt.Tooltip("potential_mwe:Q", title="Potential (MWe)"), "category:N"],
                 )
                 .properties(height=360)
             )
