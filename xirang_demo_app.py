@@ -104,7 +104,7 @@ GCAM_REGION_COLOR_PATH = PROJECT_ROOT / "data" / "gcam" / "region_colors.csv"
 GCAM_ISO3_PATH = PROJECT_ROOT / "data" / "gcam" / "region_iso3.csv"
 GEOTHERMAL_POTENTIAL_PATH = PROJECT_ROOT / "data" / "geothermal" / "global_geothermal_potential.csv"
 DATA_SCHEMA_VERSION = "2026-02-22-offshore-v1"
-BUILD_TAG = "da6199c"
+BUILD_TAG = "map-tune-v2"
 
 I18N = {
     "en": {
@@ -267,21 +267,21 @@ def generate_synthetic_wells(target_count: int) -> list[WellSite]:
         anchor = base[(idx - 1) % len(base)]
         if anchor.site_type == "Offshore":
             # Reference-style offshore layout:
-            # 1) North-east vertical strip (dominant)
+            # 1) East/North Sea belt (dominant, dispersed)
             # 2) Northern cluster above Scotland
-            # 3) Sparse east-central bridge points
+            # 3) Small east-central bridge points
             u = float(rng.random())
-            if u < 0.72:
-                lat = float(rng.uniform(53.8, 59.2))
-                lon = float(rng.normal(1.15, 0.28))
-            elif u < 0.92:
-                lat = float(rng.normal(60.1, 0.30))
-                lon = float(rng.normal(1.35, 0.35))
+            if u < 0.78:
+                lat = float(rng.uniform(53.7, 59.4))
+                lon = float(rng.normal(1.35, 0.45))
+            elif u < 0.96:
+                lat = float(rng.normal(60.0, 0.33))
+                lon = float(rng.normal(1.55, 0.40))
             else:
-                lat = float(rng.normal(56.8, 0.25))
-                lon = float(rng.normal(0.25, 0.40))
+                lat = float(rng.normal(56.7, 0.28))
+                lon = float(rng.normal(0.55, 0.35))
             lat = min(max(lat, 52.9), 60.8)
-            lon = min(max(lon, -0.7), 3.2)
+            lon = min(max(lon, -0.2), 3.6)
             anchor = WellSite(anchor.name, lat, lon, "North Sea Offshore", "Offshore")
         else:
             lat = float(anchor.lat + rng.normal(0.16, 0.14))
@@ -289,6 +289,9 @@ def generate_synthetic_wells(target_count: int) -> list[WellSite]:
             # Keep onshore points from drifting into the Irish Sea.
             if lon < -3.9 and lat < 56.0:
                 lon = float(-3.7 + abs(rng.normal(0.0, 0.22)))
+            # Move northern onshore points slightly east to reduce west-sea clustering.
+            if lat >= 55.4 and lon < -3.2:
+                lon = float(lon + abs(rng.normal(0.75, 0.28)))
             lat = min(max(lat, 49.8), 58.9)
             lon = min(max(lon, -8.1), 1.8)
         expanded.append(WellSite(f"UK-W{idx:03d}-{anchor.region}", lat, lon, anchor.region, anchor.site_type))
@@ -307,6 +310,8 @@ def cluster_from_lat_lon(lat: float, lon: float, site_type: str = "Onshore") -> 
         if lon < -2.5:
             return "C3"
         return "C4"
+    if lat >= 56.0 and lon < -3.6:
+        return "C3"
     if lat >= 56.0:
         return "C2"
     # Include part of land-edge/coastal belt in C4.
