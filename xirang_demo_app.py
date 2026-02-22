@@ -264,24 +264,28 @@ def generate_synthetic_wells(target_count: int) -> list[WellSite]:
         return base[:target_count]
 
     rng = np.random.default_rng(20260222)
+    north_sea_offshore = [w for w in base if w.site_type == "Offshore" and "North Sea" in w.region]
     expanded = base.copy()
     idx = len(base) + 1
     while len(expanded) < target_count:
         anchor = base[(idx - 1) % len(base)]
         if anchor.site_type == "Offshore":
+            # Keep west/south sea basins sparse; most new offshore wells follow North Sea pattern.
+            if "North Sea" not in anchor.region and north_sea_offshore and rng.random() < 0.85:
+                anchor = north_sea_offshore[int(rng.integers(0, len(north_sea_offshore)))]
             # Offshore wells are pushed toward real sea basins to better match UKCS-style maps.
             if "North Sea" in anchor.region:
                 lat = float(anchor.lat + rng.normal(0.18, 0.32))
                 lon = float(anchor.lon + rng.normal(0.85, 0.55))
                 lon = max(lon, 0.25)
             elif "Irish Sea" in anchor.region:
-                lat = float(anchor.lat + rng.normal(0.05, 0.26))
-                lon = float(anchor.lon + rng.normal(-0.15, 0.38))
-                lon = min(max(lon, -6.6), -3.0)
+                lat = float(anchor.lat + rng.normal(0.02, 0.20))
+                lon = float(anchor.lon + rng.normal(-0.10, 0.26))
+                lon = min(max(lon, -6.2), -3.4)
             else:  # Celtic Sea
-                lat = float(anchor.lat + rng.normal(-0.05, 0.22))
-                lon = float(anchor.lon + rng.normal(-0.10, 0.34))
-                lon = min(max(lon, -7.2), -4.0)
+                lat = float(anchor.lat + rng.normal(-0.03, 0.16))
+                lon = float(anchor.lon + rng.normal(-0.05, 0.22))
+                lon = min(max(lon, -6.8), -4.4)
             lat = min(max(lat, 49.6), 60.4)
             lon = min(max(lon, -8.6), 4.8)
         else:
