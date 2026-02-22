@@ -268,10 +268,27 @@ def generate_synthetic_wells(target_count: int) -> list[WellSite]:
     idx = len(base) + 1
     while len(expanded) < target_count:
         anchor = base[(idx - 1) % len(base)]
-        lat = float(anchor.lat + rng.normal(0.18, 0.14))
-        lon = float(anchor.lon + rng.normal(0.12, 0.16))
-        lat = min(max(lat, 49.8), 58.9)
-        lon = min(max(lon, -8.1), 2.0)
+        if anchor.site_type == "Offshore":
+            # Offshore wells are pushed toward real sea basins to better match UKCS-style maps.
+            if "North Sea" in anchor.region:
+                lat = float(anchor.lat + rng.normal(0.18, 0.32))
+                lon = float(anchor.lon + rng.normal(0.85, 0.55))
+                lon = max(lon, 0.25)
+            elif "Irish Sea" in anchor.region:
+                lat = float(anchor.lat + rng.normal(0.05, 0.26))
+                lon = float(anchor.lon + rng.normal(-0.15, 0.38))
+                lon = min(max(lon, -6.6), -3.0)
+            else:  # Celtic Sea
+                lat = float(anchor.lat + rng.normal(-0.05, 0.22))
+                lon = float(anchor.lon + rng.normal(-0.10, 0.34))
+                lon = min(max(lon, -7.2), -4.0)
+            lat = min(max(lat, 49.6), 60.4)
+            lon = min(max(lon, -8.6), 4.8)
+        else:
+            lat = float(anchor.lat + rng.normal(0.16, 0.14))
+            lon = float(anchor.lon + rng.normal(0.10, 0.16))
+            lat = min(max(lat, 49.8), 58.9)
+            lon = min(max(lon, -8.1), 1.8)
         expanded.append(WellSite(f"UK-W{idx:03d}-{anchor.region}", lat, lon, anchor.region, anchor.site_type))
         idx += 1
     return expanded
@@ -744,7 +761,7 @@ def render_monitoring_tab(
     map_df["color"] = map_df["color_hex"].apply(lambda h: hex_to_rgba(h, 220))
     map_df["line_color"] = map_df["alert"].map({"HIGH": [165, 0, 38, 255], "OK": [20, 20, 20, 190]})
     map_df["line_width"] = map_df["alert"].map({"HIGH": 2.8, "OK": 1.2})
-    uk_view = pdk.ViewState(latitude=54.5, longitude=-2.5, zoom=4.6, pitch=0)
+    uk_view = pdk.ViewState(latitude=54.6, longitude=-1.7, zoom=4.35, pitch=0)
     point_layer = pdk.Layer(
         "ScatterplotLayer",
         data=map_df,
@@ -808,7 +825,7 @@ def render_monitoring_tab(
 
     st.markdown("**Fallback UK Coordinate Plot (always visible)**")
     point_select = alt.selection_point(fields=["well"], name="well_pick", on="click", clear="dblclick")
-    x_scale = alt.Scale(domain=[-8.5, 2.2])
+    x_scale = alt.Scale(domain=[-8.8, 5.0])
     y_scale = alt.Scale(domain=[49.7, 59.0])
     base_points = (
         alt.Chart(map_df)
