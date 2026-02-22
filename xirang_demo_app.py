@@ -10,6 +10,7 @@ import pandas as pd
 import streamlit as st
 import pydeck as pdk
 import altair as alt
+import plotly.express as px
 
 from Modules.CRM_module import CRMP
 
@@ -75,6 +76,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 GCAM_SAMPLE_PATH = PROJECT_ROOT / "data" / "gcam" / "gcam_global_sample.csv"
 GCAM_CENTROID_PATH = PROJECT_ROOT / "data" / "gcam" / "region_centroids.csv"
 GCAM_REGION_COLOR_PATH = PROJECT_ROOT / "data" / "gcam" / "region_colors.csv"
+GCAM_ISO3_PATH = PROJECT_ROOT / "data" / "gcam" / "region_iso3.csv"
 
 
 def generate_synthetic_wells(target_count: int) -> list[WellSite]:
@@ -369,6 +371,19 @@ def load_region_colors(path: str) -> pd.DataFrame:
     return df
 
 
+@st.cache_data(show_spinner=False)
+def load_region_iso3(path: str) -> pd.DataFrame:
+    df = pd.read_csv(path)
+    required = {"region", "iso3"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing iso3 columns: {sorted(missing)}")
+    df = df.copy()
+    df["region"] = df["region"].astype(str).str.strip()
+    df["iso3"] = df["iso3"].astype(str).str.upper().str.strip()
+    return df
+
+
 def hex_to_rgba(color_hex: str, alpha: int = 220) -> list[int]:
     c = color_hex.strip().lstrip("#")
     if len(c) != 6:
@@ -555,6 +570,7 @@ def render_gcam_tab() -> None:
     use_uploaded = st.checkbox("Upload custom GCAM CSV", value=False)
     use_region_palette = st.checkbox("Use GCAM Region Colors", value=False)
     upload_palette = st.checkbox("Upload custom region color mapping (CSV)", value=False)
+    upload_iso3 = st.checkbox("Upload custom region->ISO3 mapping (CSV)", value=False)
     gcam_df = None
     if use_uploaded:
         uploaded = st.file_uploader("Upload GCAM CSV", type=["csv"])
@@ -581,6 +597,18 @@ def render_gcam_tab() -> None:
                 return
     elif GCAM_REGION_COLOR_PATH.exists():
         region_color_df = load_region_colors(str(GCAM_REGION_COLOR_PATH))
+
+    iso3_df = None
+    if upload_iso3:
+        iso3_file = st.file_uploader("Upload region ISO3 CSV (columns: region,iso3)", type=["csv"], key="region_iso3")
+        if iso3_file is not None:
+            try:
+                iso3_df = load_region_iso3(iso3_file)
+            except Exception as exc:
+                st.error(f"Failed to read region ISO3 file: {exc}")
+                return
+    elif GCAM_ISO3_PATH.exists():
+        iso3_df = load_region_iso3(str(GCAM_ISO3_PATH))
 
     scenarios = sorted(gcam_df["scenario"].unique())
     variables = sorted(gcam_df["variable"].unique())
@@ -664,6 +692,37 @@ def render_gcam_tab() -> None:
         .properties(height=420)
     )
     st.altair_chart(bar, use_container_width=True)
+
+    st.markdown("**Country Choropleth (GCAM Values)**")
+    choropleth_df = rank_df.copy()
+    if "iso3" in g_filtered.columns:
+        tmp = g_filtered[g_filtered["year"] == sel_year].groupby(["region", "iso3"], as_index=False)["value"].sum()
+        choropleth_df = tmp.copy()
+    elif iso3_df is not None:
+        choropleth_df = choropleth_df.merge(iso3_df, on="region", how="left")
+    else:
+        choropleth_df["iso3"] = np.nan
+
+    valid_map = choropleth_df.dropna(subset=["iso3"]).copy()
+    if not valid_map.empty:
+        fig = px.choropleth(
+            valid_map,
+            locations="iso3",
+            color="value",
+            hover_name="region",
+            hover_data={"value": ":.3f"},
+            color_continuous_scale="Turbo",
+            projection="natural earth",
+            title=f"{sel_variable} ({sel_year}, {heat_scenario if sel_scenarios else ''})",
+        )
+        fig.update_layout(margin=dict(l=0, r=0, t=45, b=0), coloraxis_colorbar_title=unit)
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No valid ISO3 mapping found. Upload mapping CSV or include `iso3` in your GCAM data.")
+
+    unmapped = choropleth_df[choropleth_df["iso3"].isna()][["region"]].drop_duplicates()
+    if not unmapped.empty:
+        st.warning(f"Unmapped regions (not shown on country fill map): {', '.join(unmapped['region'].tolist()[:12])}")
 
     if GCAM_CENTROID_PATH.exists():
         st.markdown("**Global Region Map (Centroid Bubble)**")
