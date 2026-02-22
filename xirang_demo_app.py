@@ -382,6 +382,33 @@ def hex_to_rgba(color_hex: str, alpha: int = 220) -> list[int]:
         return [255, 140, 0, alpha]
 
 
+def value_to_rgba(value: float, vmin: float, vmax: float, alpha: int = 230) -> list[int]:
+    """Continuous blue->cyan->yellow->red ramp for numeric value display."""
+    if vmax <= vmin:
+        return [239, 68, 68, alpha]
+    t = (value - vmin) / (vmax - vmin)
+    t = float(max(0.0, min(1.0, t)))
+    if t < 0.33:
+        # blue -> cyan
+        u = t / 0.33
+        r = int(30 + 20 * u)
+        g = int(90 + 150 * u)
+        b = int(220 + 20 * u)
+    elif t < 0.66:
+        # cyan -> yellow
+        u = (t - 0.33) / 0.33
+        r = int(50 + 205 * u)
+        g = int(240 - 20 * u)
+        b = int(240 - 200 * u)
+    else:
+        # yellow -> red
+        u = (t - 0.66) / 0.34
+        r = int(255)
+        g = int(220 - 150 * u)
+        b = int(40 - 20 * u)
+    return [r, g, b, alpha]
+
+
 def render_monitoring_tab(
     filtered: pd.DataFrame,
     selected_wells: list[str],
@@ -526,7 +553,7 @@ def render_gcam_tab() -> None:
     st.caption("Interactive global scenario analytics for GCAM-style outputs")
 
     use_uploaded = st.checkbox("Upload custom GCAM CSV", value=False)
-    use_region_palette = st.checkbox("Use GCAM Region Colors", value=True)
+    use_region_palette = st.checkbox("Use GCAM Region Colors", value=False)
     upload_palette = st.checkbox("Upload custom region color mapping (CSV)", value=False)
     gcam_df = None
     if use_uploaded:
@@ -644,22 +671,14 @@ def render_gcam_tab() -> None:
         map_year_df = rank_df.merge(centroid, on="region", how="left").dropna(subset=["lat", "lon"])
         if not map_year_df.empty:
             vmax = float(map_year_df["value"].max() + 1e-9)
+            vmin = float(map_year_df["value"].min())
             # Strong visual emphasis: larger bubbles + optional region palette.
-            map_year_df["norm"] = map_year_df["value"] / vmax
+            map_year_df["norm"] = map_year_df["value"] / (vmax + 1e-9)
             map_year_df["radius"] = 60000 + 240000 * np.power(map_year_df["norm"], 0.7)
             if use_region_palette and "color_hex" in map_year_df.columns:
                 map_year_df["color"] = map_year_df["color_hex"].fillna("#f59e0b").apply(lambda x: hex_to_rgba(x, 230))
             else:
-                def _color_from_norm(x: float) -> list[int]:
-                    if x < 0.25:
-                        return [59, 130, 246, 210]  # blue
-                    if x < 0.5:
-                        return [34, 197, 94, 220]   # green
-                    if x < 0.75:
-                        return [250, 204, 21, 225]  # yellow
-                    return [239, 68, 68, 235]       # red
-
-                map_year_df["color"] = map_year_df["norm"].apply(_color_from_norm)
+                map_year_df["color"] = map_year_df["value"].apply(lambda x: value_to_rgba(float(x), vmin, vmax, 230))
             map_year_df["rank"] = map_year_df["value"].rank(method="dense", ascending=False).astype(int)
             map_layer = pdk.Layer(
                 "ScatterplotLayer",
@@ -688,14 +707,24 @@ def render_gcam_tab() -> None:
                 legend_df = map_year_df[["region", "color_hex"]].drop_duplicates().head(20)
                 st.dataframe(legend_df, use_container_width=True, hide_index=True)
             else:
-                legend_df = pd.DataFrame(
-                    {
-                        "Band": ["Low", "Medium", "High", "Very High"],
-                        "Normalized Value": ["<25%", "25%-50%", "50%-75%", ">=75%"],
-                        "Color": ["Blue", "Green", "Yellow", "Red"],
-                    }
+                st.markdown("**Numeric Color Scale**")
+                legend_vals = np.linspace(vmin, vmax, 120)
+                legend_df = pd.DataFrame({"value": legend_vals, "strip": ["scale"] * len(legend_vals)})
+                legend_chart = (
+                    alt.Chart(legend_df)
+                    .mark_rect()
+                    .encode(
+                        x=alt.X("value:Q", title=f"Value ({unit})"),
+                        y=alt.Y("strip:N", title=None, axis=None),
+                        color=alt.Color("value:Q", scale=alt.Scale(scheme="turbo"), legend=None),
+                    )
+                    .properties(height=36)
                 )
-                st.dataframe(legend_df, use_container_width=True, hide_index=True)
+                st.altair_chart(legend_chart, use_container_width=True)
+                s1, s2, s3 = st.columns(3)
+                s1.metric("Min", f"{vmin:,.2f} {unit}")
+                s2.metric("Median", f"{float(np.median(map_year_df['value'])):,.2f} {unit}")
+                s3.metric("Max", f"{vmax:,.2f} {unit}")
         else:
             st.info("No centroid match found for currently selected regions.")
 
