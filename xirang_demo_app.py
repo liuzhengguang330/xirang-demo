@@ -94,7 +94,8 @@ GCAM_ISO3_PATH = PROJECT_ROOT / "data" / "gcam" / "region_iso3.csv"
 
 I18N = {
     "en": {
-        "subtitle": "UK Well Monitoring · Global GCAM Scenarios",
+        "subtitle": "eXplainable Intelligent Resilience Agent Network for Geothermal systems",
+        "subtitle_hint": "UK Well Monitoring · Global GCAM Scenarios",
         "tab_monitor": "UK Well Monitoring",
         "tab_gcam": "Global GCAM Scenarios",
         "data_source": "Data Source",
@@ -116,7 +117,8 @@ I18N = {
         "no_data_range": "No data in the selected range.",
     },
     "zh": {
-        "subtitle": "英国井网监测 · 全球GCAM情景",
+        "subtitle": "eXplainable Intelligent Resilience Agent Network for Geothermal systems",
+        "subtitle_hint": "英国井网监测 · 全球GCAM情景",
         "tab_monitor": "英国井网监测",
         "tab_gcam": "全球GCAM情景",
         "data_source": "数据源",
@@ -979,10 +981,18 @@ def main() -> None:
         letter-spacing: 0.5px;
     }
     .xirang-subtitle {
-        font-size: 1.55rem;
+        font-size: 2.0rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin-top: 0.35rem;
+        margin-bottom: 0.2rem;
+        line-height: 1.28;
+    }
+    .xirang-hint {
+        font-size: 1.25rem;
         font-weight: 600;
         color: #475569;
-        margin-bottom: 1.2rem;
+        margin-bottom: 1.25rem;
     }
     .stTabs [data-baseweb="tab"] {
         font-size: 1.45rem;
@@ -992,9 +1002,10 @@ def main() -> None:
         padding-bottom: 0.35rem;
     }
     </style>
-    <div class="xirang-title">息壤</div>
+    <div class="xirang-title">XIRANG (息壤) - Well Monitoring Demo</div>
     <div class="xirang-subtitle">%s</div>
-    """ % tr("subtitle")
+    <div class="xirang-hint">%s</div>
+    """ % (tr("subtitle"), tr("subtitle_hint"))
     st.markdown(banner_html, unsafe_allow_html=True)
 
     st.sidebar.header(tr("data_source"))
