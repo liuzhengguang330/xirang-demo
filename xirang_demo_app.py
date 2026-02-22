@@ -72,6 +72,13 @@ UK_BOUNDARIES = {
         [-8.3, 54.0], [-5.2, 54.0], [-5.2, 55.4], [-8.3, 55.4], [-8.3, 54.0]
     ],
 }
+
+CLUSTER_COLORS_HEX = {
+    "C1": "#1d3557",  # deep blue
+    "C2": "#2a9d8f",  # teal
+    "C3": "#e9c46a",  # amber
+    "C4": "#e76f51",  # terracotta
+}
 PROJECT_ROOT = Path(__file__).resolve().parent
 GCAM_SAMPLE_PATH = PROJECT_ROOT / "data" / "gcam" / "gcam_global_sample.csv"
 GCAM_CENTROID_PATH = PROJECT_ROOT / "data" / "gcam" / "region_centroids.csv"
@@ -96,6 +103,17 @@ def generate_synthetic_wells(target_count: int) -> list[WellSite]:
         expanded.append(WellSite(f"UK-W{idx:03d}-{anchor.region}", lat, lon, anchor.region))
         idx += 1
     return expanded
+
+
+def cluster_from_lat_lon(lat: float, lon: float) -> str:
+    # UK demo partition inspired by C1-C4 style zones.
+    if lat >= 55.3:
+        return "C4"
+    if lat >= 53.2:
+        return "C3"
+    if lon <= -3.2:
+        return "C2"
+    return "C1"
 
 
 def simulate_well_history(site: WellSite, n_days: int = 180) -> pd.DataFrame:
@@ -128,6 +146,7 @@ def simulate_well_history(site: WellSite, n_days: int = 180) -> pd.DataFrame:
             "p10": p10,
             "p90": p90,
             "source": "Synthetic UK",
+            "cluster": cluster_from_lat_lon(site.lat, site.lon),
         }
     )
     return df
@@ -195,6 +214,7 @@ def build_crm_dataset() -> pd.DataFrame:
                     "p10": p10[k],
                     "p90": p90[k],
                     "source": "CRM Streak",
+                    "cluster": cluster_from_lat_lon(site.lat, site.lon),
                 }
             )
 
@@ -209,7 +229,7 @@ def latest_status_table(df: pd.DataFrame, is_crm: bool) -> pd.DataFrame:
         "HIGH",
         "OK",
     )
-    return latest[["well", "region", "lat", "lon", "flow_m3h", "pressure_bar", "actual", "alert"]]
+    return latest[["well", "region", "cluster", "lat", "lon", "flow_m3h", "pressure_bar", "actual", "alert"]]
 
 
 def agent_status_block(selected_df: pd.DataFrame) -> pd.DataFrame:
@@ -440,14 +460,21 @@ def render_monitoring_tab(
 
     st.subheader("UK Well Map (Latest Snapshot)")
     map_df = latest_all.copy()
-    map_df["color"] = map_df["alert"].map({"HIGH": [220, 53, 69], "OK": [34, 197, 94]})
+    map_df["color_hex"] = map_df["cluster"].map(CLUSTER_COLORS_HEX).fillna("#6b7280")
+    map_df["color"] = map_df["color_hex"].apply(lambda h: hex_to_rgba(h, 220))
+    map_df["line_color"] = map_df["alert"].map({"HIGH": [165, 0, 38, 255], "OK": [20, 20, 20, 190]})
+    map_df["line_width"] = map_df["alert"].map({"HIGH": 2.8, "OK": 1.2})
     uk_view = pdk.ViewState(latitude=54.5, longitude=-2.5, zoom=4.6, pitch=0)
     point_layer = pdk.Layer(
         "ScatterplotLayer",
         data=map_df,
         get_position="[lon, lat]",
         get_fill_color="color",
-        get_radius=16000,
+        get_radius=20000,
+        stroked=True,
+        get_line_color="line_color",
+        get_line_width="line_width",
+        line_width_min_pixels=1,
         pickable=True,
     )
     layers = []
@@ -469,7 +496,7 @@ def render_monitoring_tab(
         layers.append(boundary_layer)
     layers.append(point_layer)
     tooltip = {
-        "html": "<b>{well}</b><br/>Region: {region}<br/>Signal: {actual}<br/>Pressure: {pressure_bar}<br/>Alert: {alert}",
+        "html": "<b>{well}</b><br/>Region: {region}<br/>Cluster: {cluster}<br/>Signal: {actual}<br/>Pressure: {pressure_bar}<br/>Alert: {alert}",
         "style": {"backgroundColor": "#111827", "color": "white"},
     }
     if show_interactive_map:
@@ -494,8 +521,9 @@ def render_monitoring_tab(
             x=alt.X("lon:Q", title="Longitude", scale=x_scale),
             y=alt.Y("lat:Q", title="Latitude", scale=y_scale),
             color=alt.Color("alert:N", scale=alt.Scale(domain=["OK", "HIGH"], range=["#22c55e", "#dc3545"])),
+            shape=alt.Shape("cluster:N", title="Cluster"),
             opacity=alt.condition(point_select, alt.value(1.0), alt.value(0.75)),
-            tooltip=["well:N", "region:N", "alert:N", "actual:Q", "pressure_bar:Q"],
+            tooltip=["well:N", "region:N", "cluster:N", "alert:N", "actual:Q", "pressure_bar:Q"],
         )
         .add_params(point_select)
     )
@@ -517,6 +545,10 @@ def render_monitoring_tab(
         on_select="rerun",
     )
     st.dataframe(latest_all.reset_index(drop=True), use_container_width=True)
+    cluster_legend = pd.DataFrame(
+        [{"Cluster": k, "Color": v} for k, v in CLUSTER_COLORS_HEX.items()]
+    )
+    st.dataframe(cluster_legend, use_container_width=True, hide_index=True)
 
     st.subheader("Single-Well Detail")
     selected_from_map = None
@@ -711,7 +743,7 @@ def render_gcam_tab() -> None:
             color="value",
             hover_name="region",
             hover_data={"value": ":.3f"},
-            color_continuous_scale="Turbo",
+            color_continuous_scale="Viridis",
             projection="natural earth",
             title=f"{sel_variable} ({sel_year}, {heat_scenario if sel_scenarios else ''})",
         )
@@ -775,7 +807,7 @@ def render_gcam_tab() -> None:
                     .encode(
                         x=alt.X("value:Q", title=f"Value ({unit})"),
                         y=alt.Y("strip:N", title=None, axis=None),
-                        color=alt.Color("value:Q", scale=alt.Scale(scheme="turbo"), legend=None),
+                        color=alt.Color("value:Q", scale=alt.Scale(scheme="viridis"), legend=None),
                     )
                     .properties(height=36)
                 )
@@ -799,7 +831,7 @@ def main() -> None:
 
     synthetic_well_count = 100
     if not is_crm:
-        synthetic_well_count = st.sidebar.slider("Synthetic Well Count", min_value=25, max_value=200, value=100, step=25)
+        synthetic_well_count = st.sidebar.slider("Synthetic Well Count", min_value=50, max_value=400, value=200, step=25)
 
     df = build_crm_dataset() if is_crm else build_synthetic_dataset(synthetic_well_count)
     wells = sorted(df["well"].unique())
@@ -807,10 +839,14 @@ def main() -> None:
     max_date = df["date"].max().date()
 
     st.sidebar.header("Dashboard Filters")
-    regions = sorted(df["region"].unique())
-    selected_regions = st.sidebar.multiselect("Regions", options=regions, default=regions)
+    region_mode = st.sidebar.radio("Region Grouping", options=["C1-C4", "Administrative"], index=0)
+    groups = sorted(df["cluster"].unique()) if region_mode == "C1-C4" else sorted(df["region"].unique())
+    selected_groups = st.sidebar.multiselect("Regions", options=groups, default=groups)
     search = st.sidebar.text_input("Well Search", value="").strip().lower()
-    candidate_wells = [w for w in wells if df[df["well"] == w]["region"].iloc[0] in selected_regions]
+    if region_mode == "C1-C4":
+        candidate_wells = [w for w in wells if df[df["well"] == w]["cluster"].iloc[0] in selected_groups]
+    else:
+        candidate_wells = [w for w in wells if df[df["well"] == w]["region"].iloc[0] in selected_groups]
     if search:
         candidate_wells = [w for w in candidate_wells if search in w.lower()]
     default_wells = candidate_wells[: min(8, len(candidate_wells))]
