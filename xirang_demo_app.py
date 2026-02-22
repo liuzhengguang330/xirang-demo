@@ -21,6 +21,7 @@ class WellSite:
     lat: float
     lon: float
     region: str
+    site_type: str = "Onshore"
 
 
 WELLS = [
@@ -49,6 +50,20 @@ WELLS = [
     WellSite("UK-W23-Plymouth", 50.3755, -4.1427, "South West"),
     WellSite("UK-W24-Norwich", 52.6309, 1.2974, "East of England"),
     WellSite("UK-W25-Hull", 53.7676, -0.3274, "Yorkshire"),
+    # Offshore oil & gas style sites for UKCS demo coverage.
+    WellSite("UK-OF01-NorthSea-A", 57.9000, 1.5000, "North Sea Offshore", "Offshore"),
+    WellSite("UK-OF02-NorthSea-B", 57.2500, 0.8500, "North Sea Offshore", "Offshore"),
+    WellSite("UK-OF03-NorthSea-C", 56.7000, 1.2000, "North Sea Offshore", "Offshore"),
+    WellSite("UK-OF04-NorthSea-D", 56.1000, 1.0000, "North Sea Offshore", "Offshore"),
+    WellSite("UK-OF05-NorthSea-E", 55.5500, 1.3000, "North Sea Offshore", "Offshore"),
+    WellSite("UK-OF06-NorthSea-F", 54.9500, 0.9000, "North Sea Offshore", "Offshore"),
+    WellSite("UK-OF07-NorthSea-G", 54.2500, 0.5000, "North Sea Offshore", "Offshore"),
+    WellSite("UK-OF08-NorthSea-H", 53.8500, 0.2000, "North Sea Offshore", "Offshore"),
+    WellSite("UK-OF09-IrishSea-A", 54.5000, -4.5000, "Irish Sea Offshore", "Offshore"),
+    WellSite("UK-OF10-IrishSea-B", 53.9000, -4.8000, "Irish Sea Offshore", "Offshore"),
+    WellSite("UK-OF11-IrishSea-C", 53.2000, -5.2000, "Irish Sea Offshore", "Offshore"),
+    WellSite("UK-OF12-CelticSea-A", 50.8000, -6.0000, "Celtic Sea Offshore", "Offshore"),
+    WellSite("UK-OF13-CelticSea-B", 50.4000, -5.2000, "Celtic Sea Offshore", "Offshore"),
 ]
 
 CRM_WELLS = [
@@ -106,6 +121,7 @@ I18N = {
         "regions": "Regions",
         "well_search": "Well Search",
         "wells": "Wells",
+        "site_types": "Site Types",
         "date_range": "Date Range",
         "show_boundaries": "Show UK Country Boundaries",
         "show_interactive": "Interactive Map Layer",
@@ -129,6 +145,7 @@ I18N = {
         "regions": "区域",
         "well_search": "井名搜索",
         "wells": "井口",
+        "site_types": "井类型",
         "date_range": "日期范围",
         "show_boundaries": "显示英国边界",
         "show_interactive": "交互地图层",
@@ -254,7 +271,7 @@ def generate_synthetic_wells(target_count: int) -> list[WellSite]:
         lon = float(anchor.lon + rng.normal(0.12, 0.16))
         lat = min(max(lat, 49.8), 58.9)
         lon = min(max(lon, -8.1), 2.0)
-        expanded.append(WellSite(f"UK-W{idx:03d}-{anchor.region}", lat, lon, anchor.region))
+        expanded.append(WellSite(f"UK-W{idx:03d}-{anchor.region}", lat, lon, anchor.region, anchor.site_type))
         idx += 1
     return expanded
 
@@ -301,6 +318,7 @@ def simulate_well_history(site: WellSite, n_days: int = 180) -> pd.DataFrame:
             "p90": p90,
             "source": "Synthetic UK",
             "cluster": cluster_from_lat_lon(site.lat, site.lon),
+            "site_type": site.site_type,
         }
     )
     return df
@@ -369,6 +387,7 @@ def build_crm_dataset() -> pd.DataFrame:
                     "p90": p90[k],
                     "source": "CRM Streak",
                     "cluster": cluster_from_lat_lon(site.lat, site.lon),
+                    "site_type": site.site_type,
                 }
             )
 
@@ -383,7 +402,7 @@ def latest_status_table(df: pd.DataFrame, is_crm: bool) -> pd.DataFrame:
         "HIGH",
         "OK",
     )
-    return latest[["well", "region", "cluster", "lat", "lon", "flow_m3h", "pressure_bar", "actual", "alert"]]
+    return latest[["well", "region", "site_type", "cluster", "lat", "lon", "flow_m3h", "pressure_bar", "actual", "alert"]]
 
 
 def agent_status_block(selected_df: pd.DataFrame) -> pd.DataFrame:
@@ -741,7 +760,7 @@ def render_monitoring_tab(
         layers.append(boundary_layer)
     layers.append(point_layer)
     tooltip = {
-        "html": f"<b>{{well}}</b><br/>Region: {{region}}<br/>Cluster: {{cluster}}<br/>Signal ({signal_unit}): {{actual}}<br/>Pressure ({pressure_unit}): {{pressure_bar}}<br/>Alert: {{alert}}",
+        "html": f"<b>{{well}}</b><br/>Region: {{region}}<br/>Site: {{site_type}}<br/>Cluster: {{cluster}}<br/>Signal ({signal_unit}): {{actual}}<br/>Pressure ({pressure_unit}): {{pressure_bar}}<br/>Alert: {{alert}}",
         "style": {"backgroundColor": "#111827", "color": "white"},
     }
     if show_interactive_map:
@@ -771,6 +790,7 @@ def render_monitoring_tab(
             tooltip=[
                 "well:N",
                 "region:N",
+                "site_type:N",
                 "cluster:N",
                 "alert:N",
                 alt.Tooltip("actual:Q", title=f"Signal ({signal_unit})", format=".2f"),
@@ -1296,11 +1316,15 @@ def main() -> None:
     is_c_group = region_mode == tr("grouping_c")
     groups = sorted(df["cluster"].unique()) if is_c_group else sorted(df["region"].unique())
     selected_groups = st.sidebar.multiselect(tr("regions"), options=groups, default=groups)
+    site_types = sorted(df["site_type"].unique()) if "site_type" in df.columns else ["Onshore"]
+    selected_site_types = st.sidebar.multiselect(tr("site_types"), options=site_types, default=site_types)
     search = st.sidebar.text_input(tr("well_search"), value="").strip().lower()
     if is_c_group:
         candidate_wells = [w for w in wells if df[df["well"] == w]["cluster"].iloc[0] in selected_groups]
     else:
         candidate_wells = [w for w in wells if df[df["well"] == w]["region"].iloc[0] in selected_groups]
+    if selected_site_types:
+        candidate_wells = [w for w in candidate_wells if df[df["well"] == w]["site_type"].iloc[0] in selected_site_types]
     if search:
         candidate_wells = [w for w in candidate_wells if search in w.lower()]
     default_wells = candidate_wells
