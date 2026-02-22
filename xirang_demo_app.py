@@ -1307,6 +1307,10 @@ def main() -> None:
         synthetic_well_count = st.sidebar.slider(tr("synthetic_well_count"), min_value=50, max_value=400, value=200, step=25)
 
     df = build_crm_dataset() if is_crm else build_synthetic_dataset(synthetic_well_count)
+    # Backward-compatible guard for cached/legacy tables without site_type.
+    if "site_type" not in df.columns:
+        df = df.copy()
+        df["site_type"] = "Onshore"
     wells = sorted(df["well"].unique())
     min_date = df["date"].min().date()
     max_date = df["date"].max().date()
@@ -1319,12 +1323,14 @@ def main() -> None:
     site_types = sorted(df["site_type"].unique()) if "site_type" in df.columns else ["Onshore"]
     selected_site_types = st.sidebar.multiselect(tr("site_types"), options=site_types, default=site_types)
     search = st.sidebar.text_input(tr("well_search"), value="").strip().lower()
+    well_meta = df.sort_values("date").groupby("well").tail(1)[["well", "cluster", "region", "site_type"]]
     if is_c_group:
-        candidate_wells = [w for w in wells if df[df["well"] == w]["cluster"].iloc[0] in selected_groups]
+        candidate_wells = well_meta[well_meta["cluster"].isin(selected_groups)]["well"].tolist()
     else:
-        candidate_wells = [w for w in wells if df[df["well"] == w]["region"].iloc[0] in selected_groups]
+        candidate_wells = well_meta[well_meta["region"].isin(selected_groups)]["well"].tolist()
     if selected_site_types:
-        candidate_wells = [w for w in candidate_wells if df[df["well"] == w]["site_type"].iloc[0] in selected_site_types]
+        site_allowed = set(well_meta[well_meta["site_type"].isin(selected_site_types)]["well"].tolist())
+        candidate_wells = [w for w in candidate_wells if w in site_allowed]
     if search:
         candidate_wells = [w for w in candidate_wells if search in w.lower()]
     default_wells = candidate_wells
