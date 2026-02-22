@@ -104,6 +104,7 @@ GCAM_REGION_COLOR_PATH = PROJECT_ROOT / "data" / "gcam" / "region_colors.csv"
 GCAM_ISO3_PATH = PROJECT_ROOT / "data" / "gcam" / "region_iso3.csv"
 GEOTHERMAL_POTENTIAL_PATH = PROJECT_ROOT / "data" / "geothermal" / "global_geothermal_potential.csv"
 DATA_SCHEMA_VERSION = "2026-02-22-offshore-v1"
+BUILD_TAG = "da6199c"
 
 I18N = {
     "en": {
@@ -1341,11 +1342,11 @@ def main() -> None:
     }
     </style>
     <div class="xirang-hero">
-    <div class="xirang-lab">REAI Lab</div>
+    <div class="xirang-lab">REAI Lab · Build %s</div>
     <div class="xirang-title">XIRANG (息壤)</div>
     <div class="xirang-subtitle">%s</div>
     </div>
-    """ % format_xirang_subtitle_html()
+    """ % (BUILD_TAG, format_xirang_subtitle_html())
     st.markdown(banner_html, unsafe_allow_html=True)
 
     st.sidebar.header(tr("data_source"))
@@ -1374,6 +1375,11 @@ def main() -> None:
     max_date = df["date"].max().date()
 
     st.sidebar.header(tr("dashboard_filters"))
+    if st.sidebar.button("Reset Filters (show Offshore)"):
+        st.session_state["site_types_v3"] = sorted(df["site_type"].unique()) if "site_type" in df.columns else ["Onshore"]
+        st.session_state["wells_v3"] = sorted(df["well"].unique())
+        st.rerun()
+
     region_mode = st.sidebar.radio(tr("region_grouping"), options=[tr("grouping_c"), tr("grouping_admin")], index=0)
     is_c_group = region_mode == tr("grouping_c")
     groups = sorted(df["cluster"].unique()) if is_c_group else sorted(df["region"].unique())
@@ -1384,7 +1390,7 @@ def main() -> None:
         tr("site_types"),
         options=site_types,
         default=site_types,
-        key="site_types_v2",
+        key="site_types_v3",
     )
     search = st.sidebar.text_input(tr("well_search"), value="").strip().lower()
     well_meta = df.sort_values("date").groupby("well").tail(1)[["well", "cluster", "region", "site_type"]]
@@ -1397,6 +1403,7 @@ def main() -> None:
         candidate_wells = [w for w in candidate_wells if w in site_allowed]
     offshore_available = int((well_meta["site_type"] == "Offshore").sum())
     st.sidebar.caption(f"Available Offshore Wells: {offshore_available}")
+    st.sidebar.caption(f"Selected Site Types: {', '.join(selected_site_types) if selected_site_types else 'None'}")
     if search:
         candidate_wells = [w for w in candidate_wells if search in w.lower()]
     default_wells = candidate_wells
@@ -1404,7 +1411,7 @@ def main() -> None:
         tr("wells"),
         options=candidate_wells,
         default=default_wells,
-        key="wells_v2",
+        key="wells_v3",
     )
     date_range = st.sidebar.date_input(tr("date_range"), value=(min_date, max_date), min_value=min_date, max_value=max_date)
     show_boundaries = st.sidebar.checkbox(tr("show_boundaries"), value=True)
