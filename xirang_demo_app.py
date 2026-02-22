@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 from os.path import join
 from pathlib import Path
+from difflib import SequenceMatcher, get_close_matches
 
 import numpy as np
 import pandas as pd
@@ -410,6 +411,45 @@ def load_region_iso3(path: str) -> pd.DataFrame:
     return df
 
 
+@st.cache_data(show_spinner=False)
+def iso3_catalog() -> pd.DataFrame:
+    gm = px.data.gapminder()[["country", "iso_alpha"]].drop_duplicates().copy()
+    gm = gm.rename(columns={"country": "name", "iso_alpha": "iso3"})
+    gm["name_norm"] = gm["name"].str.lower().str.strip()
+    return gm
+
+
+def normalize_region_name(s: str) -> str:
+    return " ".join(str(s).strip().lower().replace("&", "and").split())
+
+
+def suggest_iso3(region: str, catalog: pd.DataFrame) -> tuple[str | None, float, str]:
+    aliases = {
+        "united states": "USA",
+        "usa": "USA",
+        "uk": "GBR",
+        "united kingdom": "GBR",
+        "russia": "RUS",
+        "south korea": "KOR",
+        "north korea": "PRK",
+        "iran": "IRN",
+        "viet nam": "VNM",
+        "czech republic": "CZE",
+        "lao pdr": "LAO",
+    }
+    r = normalize_region_name(region)
+    if r in aliases:
+        return aliases[r], 0.99, "alias"
+    names = catalog["name_norm"].tolist()
+    close = get_close_matches(r, names, n=1, cutoff=0.72)
+    if not close:
+        return None, 0.0, "none"
+    best = close[0]
+    score = SequenceMatcher(None, r, best).ratio()
+    iso = catalog.loc[catalog["name_norm"] == best, "iso3"].iloc[0]
+    return str(iso), float(score), "fuzzy"
+
+
 def hex_to_rgba(color_hex: str, alpha: int = 220) -> list[int]:
     c = color_hex.strip().lstrip("#")
     if len(c) != 6:
@@ -740,6 +780,42 @@ def render_gcam_tab() -> None:
         choropleth_df = choropleth_df.merge(iso3_df, on="region", how="left")
     else:
         choropleth_df["iso3"] = np.nan
+
+    st.markdown("**Mapping Agent**")
+    catalog = iso3_catalog()
+    missing_regions = choropleth_df[choropleth_df["iso3"].isna()]["region"].drop_duplicates().tolist()
+    sugg_rows = []
+    for r in missing_regions:
+        iso, conf, mode = suggest_iso3(r, catalog)
+        sugg_rows.append(
+            {
+                "region": r,
+                "suggested_iso3": iso if iso is not None else "",
+                "confidence": round(conf, 3),
+                "method": mode,
+                "auto_apply": bool(iso is not None and conf >= 0.86),
+            }
+        )
+    sugg_df = pd.DataFrame(sugg_rows)
+    auto_apply = st.checkbox("Auto-apply high-confidence ISO3 suggestions", value=True)
+    if not sugg_df.empty:
+        st.dataframe(sugg_df, use_container_width=True, hide_index=True)
+        csv_bytes = sugg_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Download Mapping Suggestions CSV",
+            data=csv_bytes,
+            file_name="gcam_iso3_mapping_suggestions.csv",
+            mime="text/csv",
+        )
+        if auto_apply:
+            apply_map = {row["region"]: row["suggested_iso3"] for _, row in sugg_df.iterrows() if row["auto_apply"] and row["suggested_iso3"]}
+            if apply_map:
+                choropleth_df["iso3"] = choropleth_df.apply(
+                    lambda row: apply_map.get(row["region"], row["iso3"]) if pd.isna(row["iso3"]) else row["iso3"],
+                    axis=1,
+                )
+    else:
+        st.success("All selected regions already mapped to ISO3.")
 
     valid_map = choropleth_df.dropna(subset=["iso3"]).copy()
     if not valid_map.empty:
