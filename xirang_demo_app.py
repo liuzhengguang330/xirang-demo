@@ -1350,7 +1350,13 @@ def main() -> None:
     groups = sorted(df["cluster"].unique()) if is_c_group else sorted(df["region"].unique())
     selected_groups = st.sidebar.multiselect(tr("regions"), options=groups, default=groups)
     site_types = sorted(df["site_type"].unique()) if "site_type" in df.columns else ["Onshore"]
-    selected_site_types = st.sidebar.multiselect(tr("site_types"), options=site_types, default=site_types)
+    # Use a versioned widget key to reset stale persisted selections from older deployments.
+    selected_site_types = st.sidebar.multiselect(
+        tr("site_types"),
+        options=site_types,
+        default=site_types,
+        key="site_types_v2",
+    )
     search = st.sidebar.text_input(tr("well_search"), value="").strip().lower()
     well_meta = df.sort_values("date").groupby("well").tail(1)[["well", "cluster", "region", "site_type"]]
     if is_c_group:
@@ -1360,6 +1366,8 @@ def main() -> None:
     if selected_site_types:
         site_allowed = set(well_meta[well_meta["site_type"].isin(selected_site_types)]["well"].tolist())
         candidate_wells = [w for w in candidate_wells if w in site_allowed]
+    offshore_available = int((well_meta["site_type"] == "Offshore").sum())
+    st.sidebar.caption(f"Available Offshore Wells: {offshore_available}")
     if search:
         candidate_wells = [w for w in candidate_wells if search in w.lower()]
     default_wells = candidate_wells
