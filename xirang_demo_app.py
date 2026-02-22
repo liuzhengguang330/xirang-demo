@@ -598,24 +598,51 @@ def render_gcam_tab() -> None:
         map_year_df = rank_df.merge(centroid, on="region", how="left").dropna(subset=["lat", "lon"])
         if not map_year_df.empty:
             vmax = float(map_year_df["value"].max() + 1e-9)
-            map_year_df["radius"] = 12000 + 50000 * (map_year_df["value"] / vmax)
+            # Strong visual emphasis: larger bubbles + value-based color bands.
+            map_year_df["norm"] = map_year_df["value"] / vmax
+            map_year_df["radius"] = 60000 + 240000 * np.power(map_year_df["norm"], 0.7)
+            def _color_from_norm(x: float) -> list[int]:
+                if x < 0.25:
+                    return [59, 130, 246, 210]  # blue
+                if x < 0.5:
+                    return [34, 197, 94, 220]   # green
+                if x < 0.75:
+                    return [250, 204, 21, 225]  # yellow
+                return [239, 68, 68, 235]       # red
+
+            map_year_df["color"] = map_year_df["norm"].apply(_color_from_norm)
+            map_year_df["rank"] = map_year_df["value"].rank(method="dense", ascending=False).astype(int)
             map_layer = pdk.Layer(
                 "ScatterplotLayer",
                 data=map_year_df,
                 get_position="[lon, lat]",
                 get_radius="radius",
-                get_fill_color=[255, 140, 0, 160],
+                get_fill_color="color",
+                stroked=True,
+                get_line_color=[20, 20, 20, 200],
+                line_width_min_pixels=1.2,
                 pickable=True,
             )
             st.pydeck_chart(
                 pdk.Deck(
-                    map_style=None,
+                    map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
                     initial_view_state=pdk.ViewState(latitude=20, longitude=0, zoom=1.1),
                     layers=[map_layer],
-                    tooltip={"html": "<b>{region}</b><br/>Value: {value}"},
+                    tooltip={
+                        "html": "<b>{region}</b><br/>Rank: {rank}<br/>Value: {value}",
+                        "style": {"backgroundColor": "#111827", "color": "white"},
+                    },
                 ),
                 use_container_width=True,
             )
+            legend_df = pd.DataFrame(
+                {
+                    "Band": ["Low", "Medium", "High", "Very High"],
+                    "Normalized Value": ["<25%", "25%-50%", "50%-75%", ">=75%"],
+                    "Color": ["Blue", "Green", "Yellow", "Red"],
+                }
+            )
+            st.dataframe(legend_df, use_container_width=True, hide_index=True)
         else:
             st.info("No centroid match found for currently selected regions.")
 
