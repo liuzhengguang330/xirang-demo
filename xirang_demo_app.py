@@ -149,9 +149,9 @@ def tr(key: str) -> str:
 
 
 def format_xirang_subtitle_html() -> str:
-    """Highlight X I R A N G letters in the expanded project name."""
+    """Highlight X I R A N G letters in the expanded project name (X only in eXplainable)."""
     return (
-        '<span class="xirang-accent">eX</span>plainable '
+        'e<span class="xirang-accent">X</span>plainable '
         '<span class="xirang-accent">I</span>ntelligent '
         '<span class="xirang-accent">R</span>esilience '
         '<span class="xirang-accent">A</span>gent '
