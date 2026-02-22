@@ -1371,7 +1371,12 @@ def main() -> None:
     if search:
         candidate_wells = [w for w in candidate_wells if search in w.lower()]
     default_wells = candidate_wells
-    selected_wells = st.sidebar.multiselect(tr("wells"), options=candidate_wells, default=default_wells)
+    selected_wells = st.sidebar.multiselect(
+        tr("wells"),
+        options=candidate_wells,
+        default=default_wells,
+        key="wells_v2",
+    )
     date_range = st.sidebar.date_input(tr("date_range"), value=(min_date, max_date), min_value=min_date, max_value=max_date)
     show_boundaries = st.sidebar.checkbox(tr("show_boundaries"), value=True)
     show_interactive_map = st.sidebar.checkbox(tr("show_interactive"), value=True)
