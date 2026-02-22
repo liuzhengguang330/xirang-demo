@@ -1002,7 +1002,7 @@ def main() -> None:
         padding-bottom: 0.35rem;
     }
     </style>
-    <div class="xirang-title">XIRANG (息壤) - Well Monitoring Demo</div>
+    <div class="xirang-title">XIRANG (息壤)</div>
     <div class="xirang-subtitle">%s</div>
     <div class="xirang-hint">%s</div>
     """ % (tr("subtitle"), tr("subtitle_hint"))
