@@ -904,8 +904,36 @@ def render_gcam_tab() -> None:
 
 def main() -> None:
     st.set_page_config(page_title="XIRANG Demo", layout="wide")
-    st.title("XIRANG (息壤) - Well Monitoring Demo")
-    st.caption("eXplainable Intelligent Resilience Agent Network for Geothermal systems")
+    st.markdown(
+        """
+        <style>
+        .xirang-title {
+            font-size: 4.0rem;
+            font-weight: 800;
+            line-height: 1.05;
+            margin: 0.1rem 0 0.2rem 0;
+            color: #1f2937;
+            letter-spacing: 0.5px;
+        }
+        .xirang-subtitle {
+            font-size: 1.55rem;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 1.2rem;
+        }
+        .stTabs [data-baseweb="tab"] {
+            font-size: 1.45rem;
+            font-weight: 800;
+            min-height: 58px;
+            padding-top: 0.35rem;
+            padding-bottom: 0.35rem;
+        }
+        </style>
+        <div class="xirang-title">息壤</div>
+        <div class="xirang-subtitle">英国井网监测 · 全球GCAM情景</div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.sidebar.header("Data Source")
     source = st.sidebar.radio("Choose source", options=["Synthetic UK", "CRM Streak"], index=0)
@@ -937,7 +965,7 @@ def main() -> None:
     show_boundaries = st.sidebar.checkbox("Show UK Country Boundaries", value=True)
     show_interactive_map = st.sidebar.checkbox("Interactive Map Layer", value=True)
 
-    tab_monitor, tab_gcam = st.tabs(["XIRANG Monitoring", "GCAM Global Explorer"])
+    tab_monitor, tab_gcam = st.tabs(["英国井网监测", "全球GCAM情景"])
 
     with tab_monitor:
         if not selected_wells:
