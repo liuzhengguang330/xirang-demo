@@ -92,6 +92,58 @@ GCAM_CENTROID_PATH = PROJECT_ROOT / "data" / "gcam" / "region_centroids.csv"
 GCAM_REGION_COLOR_PATH = PROJECT_ROOT / "data" / "gcam" / "region_colors.csv"
 GCAM_ISO3_PATH = PROJECT_ROOT / "data" / "gcam" / "region_iso3.csv"
 
+I18N = {
+    "en": {
+        "subtitle": "UK Well Monitoring · Global GCAM Scenarios",
+        "tab_monitor": "UK Well Monitoring",
+        "tab_gcam": "Global GCAM Scenarios",
+        "data_source": "Data Source",
+        "choose_source": "Choose source",
+        "synthetic_well_count": "Synthetic Well Count",
+        "dashboard_filters": "Dashboard Filters",
+        "region_grouping": "Region Grouping",
+        "regions": "Regions",
+        "well_search": "Well Search",
+        "wells": "Wells",
+        "date_range": "Date Range",
+        "show_boundaries": "Show UK Country Boundaries",
+        "show_interactive": "Interactive Map Layer",
+        "lang": "Language",
+        "grouping_c": "C1-C4",
+        "grouping_admin": "Administrative",
+        "need_one_well": "Please select at least one well.",
+        "need_valid_date": "Please select a valid start and end date.",
+        "no_data_range": "No data in the selected range.",
+    },
+    "zh": {
+        "subtitle": "英国井网监测 · 全球GCAM情景",
+        "tab_monitor": "英国井网监测",
+        "tab_gcam": "全球GCAM情景",
+        "data_source": "数据源",
+        "choose_source": "选择数据源",
+        "synthetic_well_count": "模拟井数量",
+        "dashboard_filters": "筛选条件",
+        "region_grouping": "区域分组",
+        "regions": "区域",
+        "well_search": "井名搜索",
+        "wells": "井口",
+        "date_range": "日期范围",
+        "show_boundaries": "显示英国边界",
+        "show_interactive": "交互地图层",
+        "lang": "语言",
+        "grouping_c": "C1-C4",
+        "grouping_admin": "行政区",
+        "need_one_well": "请至少选择一口井。",
+        "need_valid_date": "请选择有效的起止日期。",
+        "no_data_range": "该时间范围无数据。",
+    },
+}
+
+
+def tr(key: str) -> str:
+    lang = st.session_state.get("lang", "en")
+    return I18N.get(lang, I18N["en"]).get(key, key)
+
 
 def generate_synthetic_wells(target_count: int) -> list[WellSite]:
     base = WELLS.copy()
@@ -904,6 +956,18 @@ def render_gcam_tab() -> None:
 
 def main() -> None:
     st.set_page_config(page_title="XIRANG Demo", layout="wide")
+    if "lang" not in st.session_state:
+        st.session_state["lang"] = "en"
+
+    st.sidebar.header(tr("lang"))
+    st.session_state["lang"] = st.sidebar.radio(
+        tr("lang"),
+        options=["en", "zh"],
+        format_func=lambda x: "English" if x == "en" else "中文",
+        index=0 if st.session_state.get("lang", "en") == "en" else 1,
+        label_visibility="collapsed",
+    )
+
     st.markdown(
         """
         <style>
@@ -930,48 +994,50 @@ def main() -> None:
         }
         </style>
         <div class="xirang-title">息壤</div>
-        <div class="xirang-subtitle">英国井网监测 · 全球GCAM情景</div>
+        <div class="xirang-subtitle">%s</div>
         """,
-        unsafe_allow_html=True,
+        unsafe_allow_html=True
+        % tr("subtitle"),
     )
 
-    st.sidebar.header("Data Source")
-    source = st.sidebar.radio("Choose source", options=["Synthetic UK", "CRM Streak"], index=0)
+    st.sidebar.header(tr("data_source"))
+    source = st.sidebar.radio(tr("choose_source"), options=["Synthetic UK", "CRM Streak"], index=0)
     is_crm = source == "CRM Streak"
 
     synthetic_well_count = 100
     if not is_crm:
-        synthetic_well_count = st.sidebar.slider("Synthetic Well Count", min_value=50, max_value=400, value=200, step=25)
+        synthetic_well_count = st.sidebar.slider(tr("synthetic_well_count"), min_value=50, max_value=400, value=200, step=25)
 
     df = build_crm_dataset() if is_crm else build_synthetic_dataset(synthetic_well_count)
     wells = sorted(df["well"].unique())
     min_date = df["date"].min().date()
     max_date = df["date"].max().date()
 
-    st.sidebar.header("Dashboard Filters")
-    region_mode = st.sidebar.radio("Region Grouping", options=["C1-C4", "Administrative"], index=0)
-    groups = sorted(df["cluster"].unique()) if region_mode == "C1-C4" else sorted(df["region"].unique())
-    selected_groups = st.sidebar.multiselect("Regions", options=groups, default=groups)
-    search = st.sidebar.text_input("Well Search", value="").strip().lower()
-    if region_mode == "C1-C4":
+    st.sidebar.header(tr("dashboard_filters"))
+    region_mode = st.sidebar.radio(tr("region_grouping"), options=[tr("grouping_c"), tr("grouping_admin")], index=0)
+    is_c_group = region_mode == tr("grouping_c")
+    groups = sorted(df["cluster"].unique()) if is_c_group else sorted(df["region"].unique())
+    selected_groups = st.sidebar.multiselect(tr("regions"), options=groups, default=groups)
+    search = st.sidebar.text_input(tr("well_search"), value="").strip().lower()
+    if is_c_group:
         candidate_wells = [w for w in wells if df[df["well"] == w]["cluster"].iloc[0] in selected_groups]
     else:
         candidate_wells = [w for w in wells if df[df["well"] == w]["region"].iloc[0] in selected_groups]
     if search:
         candidate_wells = [w for w in candidate_wells if search in w.lower()]
     default_wells = candidate_wells[: min(8, len(candidate_wells))]
-    selected_wells = st.sidebar.multiselect("Wells", options=candidate_wells, default=default_wells)
-    date_range = st.sidebar.date_input("Date Range", value=(min_date, max_date), min_value=min_date, max_value=max_date)
-    show_boundaries = st.sidebar.checkbox("Show UK Country Boundaries", value=True)
-    show_interactive_map = st.sidebar.checkbox("Interactive Map Layer", value=True)
+    selected_wells = st.sidebar.multiselect(tr("wells"), options=candidate_wells, default=default_wells)
+    date_range = st.sidebar.date_input(tr("date_range"), value=(min_date, max_date), min_value=min_date, max_value=max_date)
+    show_boundaries = st.sidebar.checkbox(tr("show_boundaries"), value=True)
+    show_interactive_map = st.sidebar.checkbox(tr("show_interactive"), value=True)
 
-    tab_monitor, tab_gcam = st.tabs(["英国井网监测", "全球GCAM情景"])
+    tab_monitor, tab_gcam = st.tabs([tr("tab_monitor"), tr("tab_gcam")])
 
     with tab_monitor:
         if not selected_wells:
-            st.warning("Please select at least one well.")
+            st.warning(tr("need_one_well"))
         elif not isinstance(date_range, tuple) or len(date_range) != 2:
-            st.warning("Please select a valid start and end date.")
+            st.warning(tr("need_valid_date"))
         else:
             start_date, end_date = date_range
             mask = (
@@ -981,7 +1047,7 @@ def main() -> None:
             )
             filtered = df.loc[mask].copy()
             if filtered.empty:
-                st.warning("No data in the selected range.")
+                st.warning(tr("no_data_range"))
             else:
                 render_monitoring_tab(
                     filtered=filtered,
